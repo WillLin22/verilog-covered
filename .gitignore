@@ -2,3 +2,9 @@ experiments/*
 __pycache__/*
 test/*
 temp*.py
+<<<<<<< HEAD
+=======
+*f32_add.io15M*
+*io1000000*
+temp/*
+>>>>>>> aa4ec81 ( small modification)

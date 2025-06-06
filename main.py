@@ -29,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument('--get-error-ios', action='store_true', help='Get error IOs')
     parser.add_argument('--get-all-ios', action='store_true', help='Get all IOs')
     parser.add_argument('--get-modified-code', action='store_true', help='Get modified code')
+    parser.add_argument('--analyse-result', action='store_true', help='Analyse the result and print the path with highest coverage')
     args = parser.parse_args()
     code_path = code_dir + args.target_file
     # "/home/willlin/miniforge3/envs/veribench/bin/iverilog"
@@ -67,38 +68,39 @@ if __name__ == "__main__":
     print(f'Total IOs: {len(analyzer.results)}')
     print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
     
-    # 对每个ast节点计算正确率，并排序
-    ast_info = list()
-    ast_info = [((e.name if e.name else 'None', e.op, e.line, e.col), \
-        [analyzer.results[i] for i in range(len(analyzer.results)) if analyzer.exec_nums[i][index] != 0]) \
-        for index, e in enumerate(analyzer.expressions) if index != 0 ]
-    ast_accuracy = [((name, op, line, col) , 1-(sum(results)/len(results)) if len(results) else 0) for (name, op, line, col), results in ast_info]
-    ast_accuracy.sort(key=lambda x: x[-1], reverse=True)
-    n_ios = len(analyzer.results)
-    n_wrong_ios = sum(1 for res in analyzer.results if res == 0)
-    ast_number = [((name, op, line, col), sum(1 for res in results if res == 0)/n_wrong_ios if n_wrong_ios != 0 else 0) for (name, op, line, col), results in ast_info]
-    ast_number.sort(key=lambda x: x[-1], reverse=True)
-    total = 20 # 输出的数量
-    def printlist(lst, total):
-        cnt = 0
-        exist = []
-        for (name, op, line, col), val in lst:
-            if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
-                continue
-            exist.append(name)
-            print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
-            cnt += 1
-            if cnt == total:
-                break
-    print('AST node error rate:')    
-    printlist(ast_accuracy, total)
-    n_cond = 0
-    for e in analyzer.expressions[1:]:
-        if e.op == 25:
-            n_cond += 1
-    print(n_cond)
-    # print('AST node error number/total error number:')
-    # printlist(ast_number, total)
+    if args.analyse_result:
+        # 对每个ast节点计算正确率，并排序
+        ast_info = list()
+        ast_info = [((e.name if e.name else 'None', e.op, e.line, e.col), \
+            [analyzer.results[i] for i in range(len(analyzer.results)) if analyzer.exec_nums[i][index] != 0]) \
+            for index, e in enumerate(analyzer.expressions) if index != 0 ]
+        ast_accuracy = [((name, op, line, col) , 1-(sum(results)/len(results)) if len(results) else 0) for (name, op, line, col), results in ast_info]
+        ast_accuracy.sort(key=lambda x: x[-1], reverse=True)
+        n_ios = len(analyzer.results)
+        n_wrong_ios = sum(1 for res in analyzer.results if res == 0)
+        ast_number = [((name, op, line, col), sum(1 for res in results if res == 0)/n_wrong_ios if n_wrong_ios != 0 else 0) for (name, op, line, col), results in ast_info]
+        ast_number.sort(key=lambda x: x[-1], reverse=True)
+        total = 20 # 输出的数量
+        def printlist(lst, total):
+            cnt = 0
+            exist = []
+            for (name, op, line, col), val in lst:
+                if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+                    continue
+                exist.append(name)
+                print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
+                cnt += 1
+                if cnt == total:
+                    break
+        print('AST node error rate:')    
+        printlist(ast_accuracy, total)
+        n_cond = 0
+        for e in analyzer.expressions[1:]:
+            if e.op == 25:
+                n_cond += 1
+        print(n_cond)
+        # print('AST node error number/total error number:')
+        # printlist(ast_number, total)
 
 
     
