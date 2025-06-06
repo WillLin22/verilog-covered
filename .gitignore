@@ -2,3 +2,5 @@ experiments/*
 __pycache__/*
 test/*
 temp*.py
+*/f32_add.io15M*
+*io1000000*
