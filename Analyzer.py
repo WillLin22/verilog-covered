@@ -65,6 +65,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
     try:
+        # print(f"cd {temp_dir} && covered score -v {code_path} -g 3 -t {function[:-2].upper()} -i testbench.{function[:-2]}_inst  -vcd {temp_dir}/{output_filename}.vcd -p tmp{output_filename} -o {temp_dir}/{output_filename}.cdd > /dev/null 2>&1")
         os.system(f"cd {temp_dir} && covered score -v {code_path} -g 3 -t {function[:-2].upper()} -i testbench.{function[:-2]}_inst  -vcd {temp_dir}/{output_filename}.vcd -p tmp{output_filename} -o {temp_dir}/{output_filename}.cdd > /dev/null 2>&1")
     except:
         print("analyzer cdd wrong")
@@ -82,18 +83,18 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
     if only_parse:
         return analyzer.expressions
-    return analyzer.get_exec_num(), result, fflag
+    return analyzer.get_exec_num(), result, fflag ,( io.split(), io_result, io_fflags)
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32):
+    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog"):
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
-        with tempfile.TemporaryDirectory(dir=f"/run/user/{os.getuid()}") as temp_dir:
+        with tempfile.TemporaryDirectory(dir=f"/home/willlin/workspace/intern/verilog-covered/temp") as temp_dir:
             os.system(f"cp {code_path} {temp_dir}/")
             os.system(f"cp ./template/{function}_testbench.sv {temp_dir}/")
             # os.system(f"cd {temp_dir} && iverilog -g2012 -o top.vvp -s testbench *v 2>/dev/null 1>/dev/null")
-            os.system(f"cd {temp_dir} && iverilog -g2012 -o top.vvp -s testbench *v ")
+            os.system(f"cd {temp_dir} && {iverilog} -g2012 -o top.vvp -s testbench *v ")
             vvp = os.path.join(temp_dir, "top.vvp")
             if not os.path.exists(vvp):
                 print("vvp not exists")
@@ -102,7 +103,7 @@ class Analyzer():
                 ios = f.readlines()
             self.expressions = _job(vvp, temp_dir, ios[0], code_path, function, only_parse=True)
             try:
-                rets = Parallel(n_jobs=n_jobs, timeout=5)(delayed(_job)(vvp, temp_dir, io, code_path, function, only_parse=False) for io in ios)
+                rets = Parallel(n_jobs=n_jobs, timeout=100)(delayed(_job)(vvp, temp_dir, io, code_path, function, only_parse=False) for io in ios)
             except KeyboardInterrupt:
                 exit()
             except Exception as e:
@@ -111,6 +112,8 @@ class Analyzer():
         self.exec_nums = [ret[0] for ret in rets]
         self.results = [ret[1] for ret in rets]
         self.fflags = [ret[2] for ret in rets]
+        self.ios = [ret[3] for ret in rets]
+        self.error_ios = [ret[3] for ret in rets if ret[1] == 0 or ret[2] == 0]
 
 
     def get_path(self, index=None, path=None, start_mark="\033[91m", end_mark="\033[0m", reverse=False):
@@ -142,6 +145,63 @@ class Analyzer():
                     path_string += start_mark + code + end_mark
             path_string += '\n'
         return path_string
+    
+    def get_modified_code(self):
+        modified = []
+        for idx, e in enumerate(self.expressions[1:]):
+            if e.father == None:
+                root = e
+                sig_list = set()
+                stack = [e.right]
+                start_line = e.line - 1
+                end_line = int()
+                if idx == len(self.expressions)-1:
+                    end_line = len(self.codes) - 1#不包含endmodule所在行
+                else:
+                    line = start_line
+                    while not self.codes[line].strip().endswith(";"):
+                        line += 1
+                    end_line = line + 1
+                codes = "".join(self.codes[start_line:end_line])
+                lcodes = codes.split('=', 1)[0]
+                rcodes = "(" + codes.split('=', 1)[1].split(';', 1)[0] + ")"
+                # SBIT_SEL = 35  # 35:0x23. Specifies single-bit signal select (i.e., [x]).
+                # MBIT_SEL = 36  # 36:0x24. Specifies multi-bit signal select (i.e., [x:y]).
+                # SIG = 1  # 1:0x01. Specifies signal value.
+                while stack:
+                    index = stack.pop()
+                    if index == 0:
+                        continue
+                    node = self.expressions[index]
+                    if node.op == 1 or node.op == 35 or node.op == 36: # SIG
+                        sig_list.add(node.name)
+                    stack.append(node.left)
+                    stack.append(node.right)
+                if len(sig_list) > 8 or len(sig_list) == 0:
+                    continue
+                sig_list = list(sig_list)
+                cond_list = [[f"{sig} == 0", f"{sig} == ~0"] for sig in sig_list]
+                import itertools
+                cond_list = [list(x) for x in itertools.product(*cond_list)]
+                res_rcodes = ""
+                for cond in cond_list:
+                    res_rcodes += "( " + " && ".join(cond) + " )" + " ? " + rcodes + " : "
+                res_rcodes += rcodes
+                modified.append([start_line, end_line, lcodes + '=' + res_rcodes + ';\n', 0])
+        with open("./fadd32_11_modified3.v", 'w+') as f:
+            for lineno, code in enumerate(self.codes):
+                is_modified = [1 if lineno >= r[0] and lineno < r[1] else 0 for r in modified]
+                if sum(is_modified) != 0:
+                    index = next((i for i, x in enumerate(is_modified) if x == 1), -1)
+                    if modified[index][3] == 0:
+                        modified[index][3] = 1
+                        f.write(modified[index][2])
+                else:
+                    f.write(code + '\n')
+            
+                    
+            
+            
 
 
 
