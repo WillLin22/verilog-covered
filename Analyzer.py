@@ -12,7 +12,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
         case "fadd32" | "fadd64":
             rm, a, b, ref_result, ref_fflags = io.split()
             command = [vvp, f"+rm={rm}", f"+a={a}", f"+b={b}"]
-            output_filename += f"_{rm}_{a:>08}_{b:>08}"
+            output_filename += f"_{rm}_{a:>08}_{b:>08}".lower()
         case "fcmp32" | "fcmp64":
             a, b, ref_result, ref_fflags = io.split()
             command = [vvp, f"+a={a}", f"+b={b}"]
@@ -90,7 +90,7 @@ class Analyzer():
     def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog"):
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
-        with tempfile.TemporaryDirectory(dir=f"/home/willlin/workspace/intern/verilog-covered/temp") as temp_dir:
+        with tempfile.TemporaryDirectory(dir=f"./temp") as temp_dir:
             os.system(f"cp {code_path} {temp_dir}/")
             os.system(f"cp ./template/{function}_testbench.sv {temp_dir}/")
             # os.system(f"cd {temp_dir} && iverilog -g2012 -o top.vvp -s testbench *v 2>/dev/null 1>/dev/null")
@@ -99,7 +99,7 @@ class Analyzer():
             if not os.path.exists(vvp):
                 print("vvp not exists")
                 return None
-            with open(f"./testdata/{function}.io10000", 'r') as f:
+            with open(f"./testdata/fadd32.io1000000.modified", 'r') as f:
                 ios = f.readlines()
             self.expressions = _job(vvp, temp_dir, ios[0], code_path, function, only_parse=True)
             try:
@@ -113,7 +113,7 @@ class Analyzer():
         self.results = [ret[1] for ret in rets]
         self.fflags = [ret[2] for ret in rets]
         self.ios = [ret[3] for ret in rets]
-        self.error_ios = [ret[3] for ret in rets if ret[1] == 0 or ret[2] == 0]
+        self.error_ios = [ret[3] for ret in rets if ret[1] == 0]
 
 
     def get_path(self, index=None, path=None, start_mark="\033[91m", end_mark="\033[0m", reverse=False):

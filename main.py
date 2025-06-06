@@ -24,7 +24,7 @@ def bitwise_and(str1, str2):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     code_dir = os.path.dirname(os.path.abspath(__file__)) + "/test/"
-    parser.add_argument('--target-file', type=str, default="fadd32_11_modified3.v",  help='Target verilog file')
+    parser.add_argument('--target-file', type=str, default="fadd32_11.v",  help='Target verilog file')
     parser.add_argument('--iverilog', type=str, default='iverilog', help='iverilog executable')
     parser.add_argument('--get-error-ios', action='store_true', help='Get error IOs')
     parser.add_argument('--get-all-ios', action='store_true', help='Get all IOs')
