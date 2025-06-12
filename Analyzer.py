@@ -177,25 +177,22 @@ class statistic():
         self.a_nfs = nf
         self.a_eps = ep
         self.a_nps = np
-        self.tarantula = lambda aef, anf, aep, anp: aef/(aef + anf) /(aef/(aef + anf) + aep/(aep + anp))
-        self.jaccard = lambda aef, anf, aep, anp: aef/(aef + anf + aep)
-        self.ochiai = lambda aef, anf, aep, anp: aef / ((aef + anf) * (aef + aep)) ** 0.5
-        self.D = lambda aef, anf, aep, anp: aef**2/(anf + aep)
-        self.naish1 = lambda aef, anf, aep, anp: -1 if anf > 0 else anp
     def printlist(self, function ,total):
         cnt = 0
         exist = []
         lst = [((e.name if e.name != None else 'None', e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
         lst.sort(key=lambda x: x[-1], reverse=True)
-        for (name, op, line, col), val in lst:
-            if name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
-                continue
-            if name != 'None':
-                exist.append(name)
-            print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
-            cnt += 1
-            if cnt == total:
-                break
+        with open(f"results_{function.__name__}.txt", "w+") as f:
+            for (name, op, line, col), val in lst:
+                if name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+                    continue
+                if name != 'None':
+                    exist.append(name)
+                print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}") 
+                f.write(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}\n") 
+                cnt += 1
+                if cnt == total:
+                    break
         
     
 class modify_code():

@@ -21,6 +21,17 @@ def bitwise_and(str1, str2):
     result = ''.join('1' if s1 == '1' and s2 == '1' else '0' for s1, s2 in zip(str1, str2))
     return result
 
+def tarantula(aef, anf, aep, anp):
+    return (aef/(aef + anf) )/(aef/(aef + anf) + aep/(aep + anp))
+def jaccard(aef, anf, aep, anp):
+    return aef/(aef + anf + aep)
+def ochiai(aef, anf, aep, anp):
+    return aef / ((aef + anf) * (aef + aep)) ** 0.5
+def D(aef, anf, aep, anp):
+    return aef**2/(anf + aep)
+def naish1(aef, anf, aep, anp):
+    return -1 if anf > 0 else anp
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     code_dir = os.path.dirname(os.path.abspath(__file__)) + "/test/"
@@ -77,7 +88,7 @@ if __name__ == "__main__":
     
     if args.analyse_result:
         statistics = statistic(analyzer.expressions, analyzer.exec_nums, analyzer.results)
-        statistics.printlist(statistics.jaccard, 20)
+        statistics.printlist(jaccard, 50)
     if args.print_ops:
         ops = list(set([int(e.op) for e in analyzer.expressions[1:]]))
         print(ops)
