@@ -185,12 +185,13 @@ class statistic():
     def printlist(self, function ,total):
         cnt = 0
         exist = []
-        lst = [((e.name, e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
+        lst = [((e.name if e.name != None else 'None', e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
         lst.sort(key=lambda x: x[-1], reverse=True)
         for (name, op, line, col), val in lst:
-            if name == None or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+            if name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
                 continue
-            exist.append(name)
+            if name != 'None':
+                exist.append(name)
             print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
             cnt += 1
             if cnt == total:
