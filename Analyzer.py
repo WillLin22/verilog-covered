@@ -3,6 +3,7 @@ import tempfile
 import subprocess
 from joblib import Parallel, delayed
 from CDDAnalyzer import CDDAnalyzer
+import time
 
 
 def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
@@ -158,10 +159,24 @@ class statistic():
     """
     def __init__(self, expressions, exec_nums , results):
         self.expressions = expressions
-        self.a_efs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
-        self.a_nfs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
-        self.a_eps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
-        self.a_nps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        starttime = time.time()
+        n = len(expressions)
+        ef = nf = ep = np = [0] * n
+        for i in range(len(exec_nums)):
+            for j in range(1, n):
+                if exec_nums[i][j] != 0 and results[i] == 0:
+                    ef[j] += 1
+                elif exec_nums[i][j] == 0 and results[i] == 0:
+                    nf[j] += 1
+                elif exec_nums[i][j] != 0 and results[i] == 1:
+                    ep[j] += 1
+                elif exec_nums[i][j] == 0 and results[i] == 1:
+                    np[j] += 1
+        endtime = time.time()
+        self.a_efs = ef
+        self.a_nfs = nf
+        self.a_eps = ep
+        self.a_nps = np
         self.tarantula = lambda aef, anf, aep, anp: aef/(aef + anf) /(aef/(aef + anf) + aep/(aep + anp))
         self.jaccard = lambda aef, anf, aep, anp: aef/(aef + anf + aep)
         self.ochiai = lambda aef, anf, aep, anp: aef / ((aef + anf) * (aef + aep)) ** 0.5
@@ -173,7 +188,7 @@ class statistic():
         lst = [((e.name, e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
         lst.sort(key=lambda x: x[-1], reverse=True)
         for (name, op, line, col), val in lst:
-            if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+            if name == None or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
                 continue
             exist.append(name)
             print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
