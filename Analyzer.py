@@ -87,7 +87,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog"):
+    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None):
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
         with tempfile.TemporaryDirectory(dir=f"./temp") as temp_dir:
@@ -99,7 +99,9 @@ class Analyzer():
             if not os.path.exists(vvp):
                 print("vvp not exists")
                 return None
-            with open(f"./testdata/fadd32.io1000000.modified", 'r') as f:
+            if iofile == None:
+                iofile = f"{function}.io10000"
+            with open("./testdata/" + iofile, 'r') as f:
                 ios = f.readlines()
             self.expressions = _job(vvp, temp_dir, ios[0], code_path, function, only_parse=True)
             try:
@@ -147,6 +149,197 @@ class Analyzer():
         return path_string
     
     def get_modified_code(self):
+        modifier = modify_code(self.expressions, self.codes)
+        return modifier.get_modified_code()
+    
+class statistic():
+    """
+    处理多样例统计信息，辅助生成节点错误率
+    """
+    def __init__(self, expressions, exec_nums , results):
+        self.expressions = expressions
+        self.a_efs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.a_nfs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.a_eps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.a_nps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.tarantula = lambda aef, anf, aep, anp: aef/(aef + anf) /(aef/(aef + anf) + aep/(aep + anp))
+        self.jaccard = lambda aef, anf, aep, anp: aef/(aef + anf + aep)
+        self.ochiai = lambda aef, anf, aep, anp: aef / ((aef + anf) * (aef + aep)) ** 0.5
+        self.D = lambda aef, anf, aep, anp: aef**2/(anf + aep)
+        self.naish1 = lambda aef, anf, aep, anp: -1 if anf > 0 else anp
+    def printlist(self, function ,total):
+        cnt = 0
+        exist = []
+        lst = [((e.name, e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
+        lst.sort(key=lambda x: x[-1], reverse=True)
+        for (name, op, line, col), val in lst:
+            if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+                continue
+            exist.append(name)
+            print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
+            cnt += 1
+            if cnt == total:
+                break
+        
+    
+class modify_code():
+    """
+    目前不支持 带有x和z的代码比较
+    使用一个新的.v文件若发现生成问题时，在运行时添加--print-ops获得代码op列表，对下面代码中的case检查是否包含了列表中除了assign类语句的全部op
+    """
+    def __init__(self, expressions, codes, output_path="./fadd32_11_modified3.v"):
+        self.expressions = expressions
+        self.codes = codes
+        self.output_path = output_path
+    def traverse_ast(self, expressions, root, val_list:list[str]):
+        """_summary_
+
+        Args:
+            expressions (list[ast]): Global ast tree
+            root (int): target expression root ast node index
+            val_list (list[str]): list of signals that assigns to be all 1
+
+        Returns:
+            tuple[int, int]: (value, width)
+        """
+        if root == 0:
+            return 
+        e = expressions[root]
+        width = e.value.width
+        if e.op == 1 or e.op == 35 or e.op == 36:
+            if e.name in val_list:
+                return (2 ** width - 1, width)
+            else:
+                return (0, width)
+        elif e.op == 0:
+            return (int(e.value.value[0], 16), width)
+        else:
+            v1 = self.traverse_ast(expressions, e.left, val_list)
+            v2 = self.traverse_ast(expressions, e.right, val_list)
+            return self.update_value(e.op, v1, v2)
+    def update_value(self, op, vleft, vright):
+            is_output_bool = False #是否输出为bool值，是的话将width改为1
+            single = False # 是否为单目运算符，如果是的话仅使用右值
+            others = False # 其他情况
+            match op:
+                case 2: # XOR
+                    op = lambda x, y: x ^ y
+                case 3: 
+                    op = lambda x, y: x * y
+                case 4:
+                    op = lambda x, y: x // y
+                case 5:
+                    op = lambda x, y: x % y
+                case 6:
+                    op = lambda x, y: x + y
+                case 7:
+                    op = lambda x, y: x - y
+                case 8:
+                    op = lambda x, y: x & y
+                case 9:
+                    op = lambda x, y: x | y
+                case 10:
+                    op = lambda x, y: ~(x & y)
+                case 11:
+                    op = lambda x, y: ~(x | y)
+                case 12:
+                    op = lambda x, y: ~(x ^ y)
+                case 13:
+                    op = lambda x, y: x < y
+                    is_output_bool = True
+                case 14:
+                    op = lambda x, y: x > y
+                    is_output_bool = True
+                case 15:
+                    op = lambda x, y: x << y
+                    is_output_bool = False
+                case 16:
+                    op = lambda x, y: x >> y
+                    is_output_bool = False
+                case 17:
+                    op = lambda x, y: x == y
+                    is_output_bool = True
+                case 18:
+                    op = lambda x, y: x == y
+                    is_output_bool = True
+                case 19:
+                    op = lambda x, y:  x <= y
+                    is_output_bool = True
+                case 20:
+                    op = lambda x, y: x >= y
+                    is_output_bool = True
+                case 21:
+                    op = lambda x, y: x != y
+                    is_output_bool = True
+                case 22:
+                    op = lambda x, y: x != y
+                    is_output_bool = True
+                case 23:
+                    op = lambda x, y: x or y
+                    is_output_bool = True
+                case 24:
+                    op = lambda x, y: x and y
+                    is_output_bool = True
+                case 29:
+                    op = lambda x: not x
+                    is_output_bool = True
+                    single = True
+                case 30:
+                    op = lambda x: x != 0
+                    is_output_bool = True
+                    single = True
+                case _:
+                    others = True
+            ret = tuple()
+            width = int()
+            if others:
+                match op:
+                    case 26: # COND_SEL
+                        ret = ((vleft[0], vright[0]), max(vleft[1], vright[1]))
+                    case 25: # COND
+                        ret = (vright[0][0] if vleft[0] else vright[0][1], vright[1])
+                    case 27: # UINV
+                        ret = (2**vright[1] - 1 - vright[0], vright[1])
+                    case 28: # UAND
+                        ret = (vright[0] == 2 ** vright[1] - 1, 1)
+                    case 49: # LIST
+                        ret = (vleft[0] * (2** vright[1]) + vright[0], vleft[1] + vright[1])
+                    case 38: # CONCAT
+                        ret = (vright[0], vright[1])
+                        
+            else:
+                if is_output_bool:
+                    width = 1
+                elif single:
+                    width = vright[1]
+                else:
+                    width = max(vleft[1], vright[1])
+                if single:
+                    ret = (op(vright[0]), width)
+                else:
+                    ret = (op(vleft[0], vright[0]), width) 
+            return ret  
+    def get_code_for_sig(self, expressions, e):
+        """Get the code for SIG, SBIT_SEL, MBIT_SEL
+        
+        Args:
+            e (ast): ast node
+        
+        Returns:
+            str: code for the signal
+        """
+        if e.op == 1:
+            return e.name
+        elif e.op == 35:  # SBIT_SEL
+            e_static = expressions[e.left]
+            return e.name + f"[{int(e_static.value.value[0], 16)}]"
+        elif e.op == 36:  # MBIT_SEL
+            e_left = expressions[e.left]
+            e_right = expressions[e.right]
+            return e.name + f"[{int(e_left.value.value[0], 16)}:{int(e_right.value.value[0], 16)}]"
+            
+    
+    def get_modified_code(self):
         modified = []
         for idx, e in enumerate(self.expressions[1:]):
             if e.father == None:
@@ -162,7 +355,7 @@ class Analyzer():
                     while not self.codes[line].strip().endswith(";"):
                         line += 1
                     end_line = line + 1
-                codes = "".join(self.codes[start_line:end_line])
+                codes = "".join(code.strip() for code in self.codes[start_line:end_line])
                 lcodes = codes.split('=', 1)[0]
                 rcodes = "(" + codes.split('=', 1)[1].split(';', 1)[0] + ")"
                 # SBIT_SEL = 35  # 35:0x23. Specifies single-bit signal select (i.e., [x]).
@@ -173,22 +366,26 @@ class Analyzer():
                     if index == 0:
                         continue
                     node = self.expressions[index]
-                    if node.op == 1 or node.op == 35 or node.op == 36: # SIG
-                        sig_list.add(node.name)
+                    if node.op == 1 or node.op == 35 or node.op == 36: 
+                        sig_list.add(self.get_code_for_sig(self.expressions, node))
                     stack.append(node.left)
                     stack.append(node.right)
-                if len(sig_list) > 8 or len(sig_list) == 0:
+                if len(sig_list) > 4 or len(sig_list) == 0:
                     continue
                 sig_list = list(sig_list)
                 cond_list = [[f"{sig} == 0", f"{sig} == ~0"] for sig in sig_list]
                 import itertools
                 cond_list = [list(x) for x in itertools.product(*cond_list)]
+                n = len(sig_list)
+                val_list = [ [sig_list[i] for i in range(n) if bits[i]] for bits in itertools.product([0,1], repeat=n) ]
                 res_rcodes = ""
-                for cond in cond_list:
-                    res_rcodes += "( " + " && ".join(cond) + " )" + " ? " + rcodes + " : "
+                for index, cond in enumerate(cond_list):
+                    val, width = self.traverse_ast(self.expressions, root.right, val_list[index])
+                    codes = f"{width}'h" + f"{abs(val) & ((1 << width) - 1):x}"
+                    res_rcodes += "( " + " && ".join(cond) + " )" + " ? " + codes + " : "
                 res_rcodes += rcodes
                 modified.append([start_line, end_line, lcodes + '=' + res_rcodes + ';\n', 0])
-        with open("./fadd32_11_modified3.v", 'w+') as f:
+        with open(self.output_path, 'w+') as f:
             for lineno, code in enumerate(self.codes):
                 is_modified = [1 if lineno >= r[0] and lineno < r[1] else 0 for r in modified]
                 if sum(is_modified) != 0:
@@ -198,6 +395,8 @@ class Analyzer():
                         f.write(modified[index][2])
                 else:
                     f.write(code + '\n')
+                    
+    
             
                     
             

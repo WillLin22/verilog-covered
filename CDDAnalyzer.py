@@ -119,10 +119,10 @@ class CDDAnalyzer():
                     msb = left.value.width - 1
                     lsb = 0
                 elif left.left != 0 and left.right == 0: # TODO: test
-                    print('To be tested')
+                    # print('To be tested')
                     msb = lsb = int(self.expressions[left.left].value.value[0], 16)
                 else: # TODO: test
-                    print('To be tested')
+                    # print('To be tested')
                     msb = int(self.expressions[left.left].value.value[0], 16)
                     lsb = int(self.expressions[left.right].value.value[0], 16)
                 stack = [e.id]
