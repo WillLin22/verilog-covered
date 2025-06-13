@@ -184,10 +184,9 @@ class statistic():
         lst.sort(key=lambda x: x[-1], reverse=True)
         with open(f"results_{function.__name__}.txt", "w+") as f:
             for (name, op, line, col), val in lst:
-                if name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+                if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
                     continue
-                if name != 'None':
-                    exist.append(name)
+                exist.append(name)
                 print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}") 
                 f.write(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}\n") 
                 cnt += 1
