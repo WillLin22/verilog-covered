@@ -159,12 +159,7 @@ class statistic():
     """
     def __init__(self, expressions, exec_nums , results):
         self.expressions = expressions
-        starttime = time.time()
         n = len(expressions)
-        self.a_efs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
-        self.a_nfs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
-        self.a_eps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
-        self.a_nps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
         ef = [0] * n
         nf = [0] * n
         ep = [0] * n
@@ -179,29 +174,25 @@ class statistic():
                     ep[j] += 1
                 elif exec_nums[i][j] == 0 and results[i] == 1:
                     np[j] += 1
-        endtime = time.time()
-        print(self.a_efs[1:] == ef[1:])
-        print(self.a_nfs[1:] == nf[1:])
-        print(self.a_eps[1:] == ep[1:])
-        print(self.a_nps[1:] == np[1:])
-        self.tarantula = lambda aef, anf, aep, anp: aef/(aef + anf) /(aef/(aef + anf) + aep/(aep + anp))
-        self.jaccard = lambda aef, anf, aep, anp: aef/(aef + anf + aep)
-        self.ochiai = lambda aef, anf, aep, anp: aef / ((aef + anf) * (aef + aep)) ** 0.5
-        self.D = lambda aef, anf, aep, anp: aef**2/(anf + aep)
-        self.naish1 = lambda aef, anf, aep, anp: -1 if anf > 0 else anp
+        self.a_efs = ef
+        self.a_nfs = nf
+        self.a_eps = ep
+        self.a_nps = np
     def printlist(self, function ,total):
         cnt = 0
         exist = []
-        lst = [((e.name, e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
+        lst = [((e.name if e.name != None else 'None', e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
         lst.sort(key=lambda x: x[-1], reverse=True)
-        for (name, op, line, col), val in lst:
-            if name == None or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
-                continue
-            exist.append(name)
-            print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}")
-            cnt += 1
-            if cnt == total:
-                break
+        with open(f"results_{function.__name__}.txt", "w+") as f:
+            for (name, op, line, col), val in lst:
+                if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
+                    continue
+                exist.append(name)
+                print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}") 
+                f.write(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}\n") 
+                cnt += 1
+                if cnt == total:
+                    break
         
     
 class modify_code():
