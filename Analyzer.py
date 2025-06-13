@@ -161,7 +161,14 @@ class statistic():
         self.expressions = expressions
         starttime = time.time()
         n = len(expressions)
-        ef = nf = ep = np = [0] * n
+        self.a_efs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.a_nfs = [sum(1 for i,res in enumerate(results) if res == 0 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.a_eps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] != 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        self.a_nps = [sum(1 for i,res in enumerate(results) if res == 1 and exec_nums[i][j] == 0) if j != 0 else None for j, _ in enumerate(expressions) ]
+        ef = [0] * n
+        nf = [0] * n
+        ep = [0] * n
+        np = [0] * n
         for i in range(len(exec_nums)):
             for j in range(1, n):
                 if exec_nums[i][j] != 0 and results[i] == 0:
@@ -173,10 +180,10 @@ class statistic():
                 elif exec_nums[i][j] == 0 and results[i] == 1:
                     np[j] += 1
         endtime = time.time()
-        self.a_efs = ef
-        self.a_nfs = nf
-        self.a_eps = ep
-        self.a_nps = np
+        print(self.a_efs[1:] == ef[1:])
+        print(self.a_nfs[1:] == nf[1:])
+        print(self.a_eps[1:] == ep[1:])
+        print(self.a_nps[1:] == np[1:])
         self.tarantula = lambda aef, anf, aep, anp: aef/(aef + anf) /(aef/(aef + anf) + aep/(aep + anp))
         self.jaccard = lambda aef, anf, aep, anp: aef/(aef + anf + aep)
         self.ochiai = lambda aef, anf, aep, anp: aef / ((aef + anf) * (aef + aep)) ** 0.5
