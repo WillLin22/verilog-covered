@@ -200,7 +200,7 @@ class modify_code():
     目前不支持 带有x和z的代码比较
     使用一个新的.v文件若发现生成问题时，在运行时添加--print-ops获得代码op列表，对下面代码中的case检查是否包含了列表中除了assign类语句的全部op
     """
-    def __init__(self, expressions, codes, output_path="./fadd32_11_modified3.v"):
+    def __init__(self, expressions, codes, output_path="./fadd32_11_modified.v"):
         self.expressions = expressions
         self.codes = codes
         self.output_path = output_path
@@ -220,7 +220,7 @@ class modify_code():
         e = expressions[root]
         width = e.value.width
         if e.op == 1 or e.op == 35 or e.op == 36:
-            if e.name in val_list:
+            if self.get_code_for_sig(expressions, e) in val_list:
                 return (2 ** width - 1, width)
             else:
                 return (0, width)
