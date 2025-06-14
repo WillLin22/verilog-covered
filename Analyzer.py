@@ -88,7 +88,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None):
+    def __init__(self, code_path, function, n_jobs=128, iverilog="iverilog", iofile=None):
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
         with tempfile.TemporaryDirectory(dir=f"./temp") as temp_dir:
@@ -185,9 +185,6 @@ class statistic():
         lst.sort(key=lambda x: x[-1], reverse=True)
         with open(f"results_{function.__name__}.txt", "w+") as f:
             for (name, op, line, col), val in lst:
-                if name == 'None' or name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
-                    continue
-                exist.append(name)
                 print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}") 
                 f.write(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}\n") 
                 cnt += 1
