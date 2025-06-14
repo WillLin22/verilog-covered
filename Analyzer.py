@@ -88,7 +88,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None):
+    def __init__(self, code_path, function, n_jobs=128, iverilog="iverilog", iofile=None):
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
         with tempfile.TemporaryDirectory(dir=f"./temp") as temp_dir:
