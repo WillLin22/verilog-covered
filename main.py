@@ -88,7 +88,7 @@ if __name__ == "__main__":
     
     if args.analyse_result:
         statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
-        statistics.printlist(jaccard, 50)
+        statistics.printlist(args.target_file ,jaccard, 50)
     if args.print_ops:
         ops = list(set([int(e.op) for e in analyzer.expressions[1:]]))
         print(ops)
