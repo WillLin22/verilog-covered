@@ -88,7 +88,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=128, iverilog="iverilog", iofile=None):
+    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None):
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
         with tempfile.TemporaryDirectory(dir=f"./temp") as temp_dir:
@@ -153,12 +153,33 @@ class Analyzer():
         modifier = modify_code(self.expressions, self.codes)
         return modifier.get_modified_code()
     
+    
+def get_code_for_sig(expressions, e):
+    """Get the code for SIG, SBIT_SEL, MBIT_SEL
+    
+    Args:
+        e (ast): ast node
+    
+    Returns:
+        str: code for the signal
+    """
+    if e.op == 1:
+        return e.name
+    elif e.op == 35:  # SBIT_SEL
+        e_static = expressions[e.left]
+        return e.name + f"[{int(e_static.value.value[0], 16)}]"
+    elif e.op == 36:  # MBIT_SEL
+        e_left = expressions[e.left]
+        e_right = expressions[e.right]
+        return e.name + f"[{int(e_left.value.value[0], 16)}:{int(e_right.value.value[0], 16)}]"
+    
 class statistic():
     """
     处理多样例统计信息，辅助生成节点错误率
     """
-    def __init__(self, expressions, exec_nums , results):
+    def __init__(self, expressions, codes, exec_nums , results):
         self.expressions = expressions
+        self.codes = codes
         n = len(expressions)
         ef = [0] * n
         nf = [0] * n
@@ -181,7 +202,7 @@ class statistic():
     def printlist(self, function ,total):
         cnt = 0
         exist = []
-        lst = [((e.name if e.name != None else 'None', e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
+        lst = [((get_code_for_sig(self.expressions, e) if e.name != None else 'None', e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
         lst.sort(key=lambda x: x[-1], reverse=True)
         with open(f"results_{function.__name__}.txt", "w+") as f:
             for (name, op, line, col), val in lst:
@@ -189,8 +210,10 @@ class statistic():
                     continue
                 if not name == 'None':
                     exist.append(name)
-                print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}") 
+                # print(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}") 
+                # print(f"\t\t{self.codes[line-1][col[0]:col[1] + 1]}")
                 f.write(f"\t{name}:\tline:{line}, col{col}: \t{val:.4f}\n") 
+                f.write(f"\t\t{self.codes[line-1][col[0]:col[1] + 1]}\n")
                 cnt += 1
                 if cnt == total:
                     break
@@ -221,7 +244,7 @@ class modify_code():
         e = expressions[root]
         width = e.value.width
         if e.op == 1 or e.op == 35 or e.op == 36:
-            if self.get_code_for_sig(expressions, e) in val_list:
+            if get_code_for_sig(expressions, e) in val_list:
                 return (2 ** width - 1, width)
             else:
                 return (0, width)
@@ -333,24 +356,6 @@ class modify_code():
                 else:
                     ret = (op(vleft[0], vright[0]), width) 
             return ret  
-    def get_code_for_sig(self, expressions, e):
-        """Get the code for SIG, SBIT_SEL, MBIT_SEL
-        
-        Args:
-            e (ast): ast node
-        
-        Returns:
-            str: code for the signal
-        """
-        if e.op == 1:
-            return e.name
-        elif e.op == 35:  # SBIT_SEL
-            e_static = expressions[e.left]
-            return e.name + f"[{int(e_static.value.value[0], 16)}]"
-        elif e.op == 36:  # MBIT_SEL
-            e_left = expressions[e.left]
-            e_right = expressions[e.right]
-            return e.name + f"[{int(e_left.value.value[0], 16)}:{int(e_right.value.value[0], 16)}]"
             
     
     def get_modified_code(self):
@@ -381,7 +386,7 @@ class modify_code():
                         continue
                     node = self.expressions[index]
                     if node.op == 1 or node.op == 35 or node.op == 36: 
-                        sig_list.add(self.get_code_for_sig(self.expressions, node))
+                        sig_list.add(get_code_for_sig(self.expressions, node))
                     stack.append(node.left)
                     stack.append(node.right)
                 if len(sig_list) > 4 or len(sig_list) == 0:

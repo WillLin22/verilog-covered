@@ -22,13 +22,13 @@ def bitwise_and(str1, str2):
     return result
 
 def tarantula(aef, anf, aep, anp):
-    return (aef/(aef + anf) )/(aef/(aef + anf) + aep/(aep + anp))
+    return (aef/(aef + anf) )/(aef/(aef + anf) + aep/(aep + anp)) if aef+anf>0 and aep+anp > 0 and aef+aep > 0 else -1 
 def jaccard(aef, anf, aep, anp):
-    return aef/(aef + anf + aep)
+    return aef/(aef + anf + aep) if aef + anf + aep > 0 else -1
 def ochiai(aef, anf, aep, anp):
-    return aef / ((aef + anf) * (aef + aep)) ** 0.5
+    return aef / ((aef + anf) * (aef + aep)) ** 0.5 if aef + anf > 0 and aef + aep > 0 else -1
 def D(aef, anf, aep, anp):
-    return aef**2/(anf + aep)
+    return aef**2/(anf + aep) if anf + aep > 0 else -1
 def naish1(aef, anf, aep, anp):
     return -1 if anf > 0 else anp
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
     
     if args.analyse_result:
-        statistics = statistic(analyzer.expressions, analyzer.exec_nums, analyzer.results)
+        statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
         statistics.printlist(jaccard, 50)
     if args.print_ops:
         ops = list(set([int(e.op) for e in analyzer.expressions[1:]]))
