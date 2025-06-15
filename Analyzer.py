@@ -149,8 +149,8 @@ class Analyzer():
             path_string += '\n'
         return path_string
     
-    def get_modified_code(self):
-        modifier = modify_code(self.expressions, self.codes)
+    def get_modified_code(self, target_file):
+        modifier = modify_code(self.expressions, self.codes, output_path=f"./{target_file.split('.')[0]}_modified.v")
         return modifier.get_modified_code()
     
     

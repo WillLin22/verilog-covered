@@ -82,7 +82,7 @@ if __name__ == "__main__":
     if args.get_time:
         print(f"Analysis time: {end_time - start_time:.4f} seconds")
     if args.get_modified_code:
-        analyzer.get_modified_code()
+        analyzer.get_modified_code(args.target_file)
     print(f'Total IOs: {len(analyzer.results)}')
     print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
     
