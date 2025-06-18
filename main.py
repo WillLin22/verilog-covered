@@ -1,6 +1,8 @@
 from Analyzer import Analyzer, statistic
 import argparse
 import os
+import time
+import pickle
 
 def bitwise_or(str1, str2):
     # 确保两个字符串长度相同
@@ -40,17 +42,18 @@ if __name__ == "__main__":
     parser.add_argument('--get-error-ios', action='store_true', help='Get error IOs')
     parser.add_argument('--get-all-ios', action='store_true', help='Get all IOs')
     parser.add_argument('--get-modified-code', action='store_true', help='Get modified code')
-    parser.add_argument('--analyse-result', action='store_true')
+    parser.add_argument('--analyse-result', action='store_true', help='Run the simulation and analyse the result')
     parser.add_argument('--print-ops', action='store_true', help='Print all operations in the code')
     parser.add_argument('--ios', default=None, type=str, help='IOs file to read')
     parser.add_argument('--get-time', action='store_true', help='Get time of analysis')
+    parser.add_argument('--store', action='store_true', help='Store the analyzer object to a pickle file')
+    parser.add_argument('--analyse-only', action='store_true', help='Analyse the result only, do not run the simulation. Conflicted with get_all_ios and get_error_ios')
     args = parser.parse_args()
     code_path = code_dir + args.target_file
     # "/home/willlin/miniforge3/envs/veribench/bin/iverilog"
     iverilog = args.iverilog
-    import time
     start_time = time.time()
-    analyzer = Analyzer(code_path, "fadd32", iverilog=iverilog, iofile=args.ios)
+    analyzer = Analyzer(code_path, "fadd32", iverilog=iverilog, iofile=args.ios, load_results=args.analyse_only, store_results=args.store)
     end_time = time.time()
     ios = analyzer.error_ios if args.get_error_ios else analyzer.ios
     if args.get_error_ios or args.get_all_ios:
@@ -86,7 +89,7 @@ if __name__ == "__main__":
     print(f'Total IOs: {len(analyzer.results)}')
     print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
     
-    if args.analyse_result:
+    if args.analyse_result or args.analyse_only:
         statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
         statistics.printlist(args.target_file ,jaccard, 50)
     if args.print_ops:

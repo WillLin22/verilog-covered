@@ -6,4 +6,6 @@ testdata/*
 *f32_add.io15M*
 *io1000000*
 temp/*
-
+results/*
+pkl/*
+.vscode/*

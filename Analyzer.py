@@ -4,6 +4,7 @@ import subprocess
 from joblib import Parallel, delayed
 from CDDAnalyzer import CDDAnalyzer
 import time
+import pickle
 
 
 def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
@@ -88,9 +89,20 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None):
+    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
+        pkl_path = f"./pkl/{code_path.split('/')[-1].split('.')[0]}_{iofile.replace('.', '_')}_analyzer.pkl"
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
+        if load_results:
+            try:
+                with open(pkl_path, 'rb') as f:
+                    self.expressions,self.exec_nums, self.results, self.fflags = pickle.load(f)
+                self.ios = []
+                self.error_ios = []
+                return
+            except FileNotFoundError:
+                print(f"File {pkl_path} not found. Re-running the simulation and store the results.")
+                store_results = True
         with tempfile.TemporaryDirectory(dir=f"./temp") as temp_dir:
             os.system(f"cp {code_path} {temp_dir}/")
             os.system(f"cp ./template/{function}_testbench.sv {temp_dir}/")
@@ -117,6 +129,11 @@ class Analyzer():
         self.fflags = [ret[2] for ret in rets]
         self.ios = [ret[3] for ret in rets]
         self.error_ios = [ret[3] for ret in rets if ret[1] == 0]
+        if store_results:
+            if not os.path.exists("./pkl"):
+                os.makedirs("./pkl")
+            with open(pkl_path, 'wb') as f:
+                pickle.dump((self.expressions, self.exec_nums, self.results, self.fflags), f)
 
 
     def get_path(self, index=None, path=None, start_mark="\033[91m", end_mark="\033[0m", reverse=False):
@@ -177,7 +194,7 @@ class statistic():
     """
     处理多样例统计信息，辅助生成节点错误率
     """
-    def __init__(self, expressions, codes, exec_nums , results):
+    def __init__(self, expressions, codes, exec_nums, results):
         self.expressions = expressions
         self.codes = codes
         n = len(expressions)
