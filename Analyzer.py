@@ -89,7 +89,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
+    def __init__(self, code_path, function, n_jobs=16, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
         pkl_path = f"./pkl/{code_path.split('/')[-1].split('.')[0]}_{iofile.replace('.', '_')}_analyzer.pkl"
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
@@ -169,6 +169,9 @@ class Analyzer():
     def get_modified_code(self, target_file):
         modifier = modify_code(self.expressions, self.codes, output_path=f"./{target_file.split('.')[0]}_modified.v")
         return modifier.get_modified_code()
+    def add_variables(self, target_file):
+        modifier = modify_code(self.expressions, self.codes, output_path=f"./{target_file.split('.')[0]}_modified.v")
+        return modifier.add_variables()
     
     
 def get_code_for_sig(expressions, e):
@@ -374,7 +377,59 @@ class modify_code():
                     ret = (op(vleft[0], vright[0]), width) 
             return ret  
             
-    
+    def _get_range(self, idx, e):
+        start_line = e.line - 1
+        end_line = int()
+        if idx == len(self.expressions)-1:
+            end_line = len(self.codes) - 1#不包含endmodule所在行
+        else:
+            line = start_line
+            while not self.codes[line].strip().endswith(";"):
+                line += 1
+            end_line = line + 1
+        return start_line, end_line
+    def _get_str_from_op(self, op):
+        match op:
+            case 2: return  lambda x, y, xw, yw: (f"{x} ^ {y}",max(xw, yw))
+            case 3: return  lambda x, y, xw, yw: (f"{x} * {y}", xw* yw)
+            case 4: return  lambda x, y, xw, yw: (f"{x} / {y}",max(xw, yw))
+            case 5: return  lambda x, y, xw, yw: (f"{x} % {y}",max(xw, yw))
+            case 6: return  lambda x, y, xw, yw: (f"{x} + {y}",max(xw, yw))
+            case 7: return  lambda x, y, xw, yw: (f"{x} - {y}",max(xw, yw))
+            case 8: return  lambda x, y, xw, yw: (f"{x} & {y}",max(xw, yw))
+            case 9: return  lambda x, y, xw, yw: (f"{x} | {y}",max(xw, yw))
+            case 10: return lambda x, y, xw, yw: (f"~({x} & {y})",max(xw, yw))
+            case 11: return lambda x, y, xw, yw: (f"~({x} | {y})",max(xw, yw))
+            case 12: return lambda x, y, xw, yw: (f"~({x} ^ {y})",max(xw, yw))
+            case 13: return lambda x, y, xw, yw: (f"{x} < {y}", 1)
+            case 14: return lambda x, y, xw, yw: (f"{x} > {y}", 1)
+            case 15: return lambda x, y, xw, yw: (f"{x} << {y}", xw)
+            case 16: return lambda x, y, xw, yw: (f"{x} >> {y}", xw)
+            case 17: return lambda x, y, xw, yw: (f"{x} == {y}", 1)
+            case 18: return lambda x, y, xw, yw: (f"{x} === {y}", 1)
+            case 19: return lambda x, y, xw, yw: (f"{x} <= {y}", 1)
+            case 20: return lambda x, y, xw, yw: (f"{x} >= {y}", 1)
+            case 21: return lambda x, y, xw, yw: (f"{x} != {y}", 1)
+            case 22: return lambda x, y, xw, yw: (f"{x} !== {y}", 1)
+            case 23: return lambda x, y, xw, yw: (f"{x} || {y}", 1)
+            case 24: return lambda x, y, xw, yw: (f"{x} && {y}", 1)
+            case 25: return lambda x, y, xw, yw: (f"{x} ? {y}", yw)
+            case 26: return lambda x, y, xw, yw: (f"{x} : {y}",max(xw, yw))
+            case 27: return lambda x, y, xw, yw: (f"~{y}", yw)
+            case 28: return lambda x, y, xw, yw: (f"&{y}", 1)
+            case 29: return lambda x, y, xw, yw: (f"!{y}", 1)
+            case 30: return lambda x, y, xw, yw: (f"|{y}", 1)
+            case 31: return lambda x, y, xw, yw: (f"^{y}", 1)
+            case 32: return lambda x, y, xw, yw: (f"~&{y}", 1)
+            case 33: return lambda x, y, xw, yw: (f"~|{y}", 1)
+            case 34: return lambda x, y, xw, yw: (f"~^{y}", 1)
+            case 37: return lambda x, y, xw, yw: ("{" + x + "{" + y + "}"*2, 2 ** xw * yw)
+            case 38: return lambda x, y, xw, yw: ("{" + y + "}",yw)
+            case 49: return lambda x, y, xw, yw: (f"{x}, {y}", xw + yw)
+            case _:
+                print(f"_get_str_from_op does not accept op {op}!")
+            
+            
     def get_modified_code(self):
         modified = []
         for idx, e in enumerate(self.expressions[1:]):
@@ -382,15 +437,7 @@ class modify_code():
                 root = e
                 sig_list = set()
                 stack = [e.right]
-                start_line = e.line - 1
-                end_line = int()
-                if idx == len(self.expressions)-1:
-                    end_line = len(self.codes) - 1#不包含endmodule所在行
-                else:
-                    line = start_line
-                    while not self.codes[line].strip().endswith(";"):
-                        line += 1
-                    end_line = line + 1
+                start_line, end_line = self._get_range(idx, e)
                 codes = "".join(code.strip() for code in self.codes[start_line:end_line])
                 lcodes = codes.split('=', 1)[0]
                 rcodes = "(" + codes.split('=', 1)[1].split(';', 1)[0] + ")"
@@ -421,6 +468,11 @@ class modify_code():
                     res_rcodes += "( " + " && ".join(cond) + " )" + " ? " + codes + " : "
                 res_rcodes += rcodes
                 modified.append([start_line, end_line, lcodes + '=' + res_rcodes + ';\n', 0])
+        self._output_modified_code(modified)
+    def _output_modified_code(self, modified):
+        """
+        modified: [[start_line, end_line, code, 0], ...]
+        """
         with open(self.output_path, 'w+') as f:
             for lineno, code in enumerate(self.codes):
                 is_modified = [1 if lineno >= r[0] and lineno < r[1] else 0 for r in modified]
@@ -431,6 +483,58 @@ class modify_code():
                         f.write(modified[index][2])
                 else:
                     f.write(code + '\n')
+            
+    def add_variables(self):
+        def last_order_traversal(self, e, cnt, added_var_dict, var_name, var_width):
+            """
+            return:
+                (level, var_cnt, width, code_for_this_part)
+                level: int, the level of the node in the tree
+                var_cnt: int, the number of variables added to the expression
+            """
+            if e == None:
+                return (0, cnt, 0, "")
+            if e.op == 0 or e.op == 1 or e.op == 35 or e.op == 36:
+                return (1, cnt, e.value.width, self.codes[e.line - 1][e.col[0]:e.col[1] + 1])
+            left = self.expressions[e.left] if e.left != 0 else None
+            right = self.expressions[e.right] if e.right != 0 else None
+            func = self._get_str_from_op(e.op)
+            d1, cnt1, w1, lcode = last_order_traversal(self, left, cnt, added_var_dict, var_name, var_width)
+            d2, cnt , w2, rcode = last_order_traversal(self, right, cnt1, added_var_dict, var_name, var_width)
+            d = max(d1, d2) + 1
+            code, width = func(lcode, rcode, w1, w2)
+            if d > 1 and e.op != 49 and e.op != 26 and e.op != 38: # LIST, COND_SEL, CONCAT
+                new_var_name = f"{var_name}_{cnt}"
+                added_var_dict[new_var_name] = (code, width)
+                code = new_var_name
+                cnt = cnt + 1
+            if e.op == 49 or e.op == 26 or e.op == 38: # LIST
+                d = d - 1
+            return (d, cnt, width, code)
+        modified = []
+        appeared_vars = set()
+        for i, e in enumerate(self.expressions[1:]):
+            if e.father == None:
+                added_var_dict = {}
+                left = self.expressions[e.left]
+                right = self.expressions[e.right]
+                name = left.name
+                width = left.value.width
+                start_line, end_line = self._get_range(i, e)
+                _, _, _, rcode = last_order_traversal(self, right, 0, added_var_dict, name, width)
+                if rcode in added_var_dict:
+                    rcode0 = rcode
+                    rcode, _ = added_var_dict[rcode]
+                    added_var_dict.pop(rcode0)
+                code = ""
+                sel = lambda width : f"[{width-1}:0]" if width > 1 else ""
+                for k, (v, w) in added_var_dict.items():
+                    code += f"wire {sel(w)}{k} = {v};\n"
+                begin = f"wire {sel(width)}" if name not in appeared_vars else "assign "
+                code += f"{begin}{name} = {rcode};\n"
+                modified.append([start_line, end_line, code, 0])
+        self._output_modified_code(modified)
+                
                     
     
             

@@ -42,6 +42,7 @@ if __name__ == "__main__":
     parser.add_argument('--get-error-ios', action='store_true', help='Get error IOs')
     parser.add_argument('--get-all-ios', action='store_true', help='Get all IOs')
     parser.add_argument('--get-modified-code', action='store_true', help='Get modified code')
+    parser.add_argument('--add-variables', action='store_true', help='Add middle vars into code')
     parser.add_argument('--analyse-result', action='store_true', help='Run the simulation and analyse the result')
     parser.add_argument('--print-ops', action='store_true', help='Print all operations in the code')
     parser.add_argument('--ios', default=None, type=str, help='IOs file to read')
@@ -86,6 +87,8 @@ if __name__ == "__main__":
         print(f"Analysis time: {end_time - start_time:.4f} seconds")
     if args.get_modified_code:
         analyzer.get_modified_code(args.target_file)
+    if args.add_variables:
+        analyzer.add_variables(args.target_file)
     print(f'Total IOs: {len(analyzer.results)}')
     print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
     
