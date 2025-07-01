@@ -1,0 +1,100 @@
+	None:	line:12, col(35, 38): 	0.0000
+		1'h0
+	None:	line:12, col(14, 38): 	0.0000
+		(io_a[31] == 1'b0) ? 1'h0
+	None:	line:12, col(27, 30): 	0.0000
+		1'b0
+	None:	line:12, col(20, 21): 	0.0000
+		31
+	('io_a[31]', 1):	line:12, col(15, 22): 	0.0000
+		io_a[31]
+	None:	line:12, col(15, 30): 	0.0000
+		io_a[31] == 1'b0
+	None:	line:12, col(14, 49): 	0.0000
+		(io_a[31] == 1'b0) ? 1'h0 : sign_a_0
+	('sign_a', 1):	line:12, col(5, 10): 	0.0000
+		sign_a
+	None:	line:12, col(5, 49): 	0.0000
+		sign_a = (io_a[31] == 1'b0) ? 1'h0 : sign_a_0
+	None:	line:14, col(35, 38): 	0.0000
+		1'h0
+	None:	line:14, col(14, 38): 	0.0000
+		(io_b[31] == 1'b0) ? 1'h0
+	None:	line:14, col(27, 30): 	0.0000
+		1'b0
+	None:	line:14, col(20, 21): 	0.0000
+		31
+	('io_b[31]', 1):	line:14, col(15, 22): 	0.0000
+		io_b[31]
+	None:	line:14, col(15, 30): 	0.0000
+		io_b[31] == 1'b0
+	None:	line:14, col(14, 49): 	0.0000
+		(io_b[31] == 1'b0) ? 1'h0 : sign_b_0
+	('sign_b', 1):	line:14, col(5, 10): 	0.0000
+		sign_b
+	None:	line:14, col(5, 49): 	0.0000
+		sign_b = (io_b[31] == 1'b0) ? 1'h0 : sign_b_0
+	None:	line:15, col(63, 64): 	0.0000
+		23
+	None:	line:15, col(60, 61): 	0.0000
+		30
+	('io_a[30:23]', 8):	line:15, col(55, 65): 	0.0000
+		io_a[30:23]
+	None:	line:15, col(20, 51): 	0.0000
+		(io_a[30:23] == (~8'b0)) ? 8'hff
+	None:	line:15, col(38, 41): 	0.0000
+		8'b0
+	None:	line:15, col(37, 37): 	0.0000
+		~
+	None:	line:15, col(29, 30): 	0.0000
+		23
+	None:	line:15, col(26, 27): 	0.0000
+		30
+	None:	line:15, col(21, 42): 	0.0000
+		io_a[30:23] == (~8'b0)
+	None:	line:15, col(20, 65): 	0.0000
+		(io_a[30:23] == (~8'b0)) ? 8'hff : io_a[30:23]
+	('exp_a_0', 8):	line:15, col(10, 16): 	0.0000
+		exp_a_0
+	None:	line:15, col(10, 65): 	0.0000
+		exp_a_0 = (io_a[30:23] == (~8'b0)) ? 8'hff : io_a[30:23]
+	None:	line:16, col(18, 45): 	0.0000
+		(io_a[30:23] == 8'b0) ? 8'h0
+	None:	line:16, col(34, 37): 	0.0000
+		8'b0
+	None:	line:16, col(27, 28): 	0.0000
+		23
+	None:	line:16, col(24, 25): 	0.0000
+		30
+	None:	line:16, col(19, 37): 	0.0000
+		io_a[30:23] == 8'b0
+	None:	line:16, col(18, 55): 	0.0000
+		(io_a[30:23] == 8'b0) ? 8'h0 : exp_a_0
+	('exp_a', 8):	line:16, col(10, 14): 	0.0000
+		exp_a
+	None:	line:16, col(10, 55): 	0.0000
+		exp_a = (io_a[30:23] == 8'b0) ? 8'h0 : exp_a_0
+	None:	line:17, col(63, 64): 	0.0000
+		23
+	None:	line:17, col(60, 61): 	0.0000
+		30
+	('io_b[30:23]', 8):	line:17, col(55, 65): 	0.0000
+		io_b[30:23]
+	None:	line:17, col(20, 51): 	0.0000
+		(io_b[30:23] == (~8'b0)) ? 8'hff
+	None:	line:17, col(38, 41): 	0.0000
+		8'b0
+	None:	line:17, col(37, 37): 	0.0000
+		~
+	None:	line:17, col(29, 30): 	0.0000
+		23
+	None:	line:17, col(26, 27): 	0.0000
+		30
+	None:	line:17, col(21, 42): 	0.0000
+		io_b[30:23] == (~8'b0)
+	None:	line:17, col(20, 65): 	0.0000
+		(io_b[30:23] == (~8'b0)) ? 8'hff : io_b[30:23]
+	('exp_b_0', 8):	line:17, col(10, 16): 	0.0000
+		exp_b_0
+	None:	line:17, col(10, 65): 	0.0000
+		exp_b_0 = (io_b[30:23] == (~8'b0)) ? 8'hff : io_b[30:23]

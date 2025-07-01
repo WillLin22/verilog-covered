@@ -3,6 +3,7 @@ import argparse
 import os
 import time
 import pickle
+from tools import Assign_Graph, Fault_Locate_Analyzer_Simple
 
 def bitwise_or(str1, str2):
     # 确保两个字符串长度相同
@@ -92,12 +93,21 @@ if __name__ == "__main__":
     print(f'Total IOs: {len(analyzer.results)}')
     print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
     
+    
     if args.analyse_result or args.analyse_only:
+        graph = Assign_Graph()
+        dists = graph.run(analyzer.expressions)
         statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
-        statistics.printlist(args.target_file ,jaccard, 50)
+        lst = statistics.get_var_location_list(jaccard)
+        fault_analyzer = Fault_Locate_Analyzer_Simple(dists, "n_carry_out", lst, vars_limit=10, dist_factor=0.5)
+        score = fault_analyzer.analyse()
+        print(f"Fault location score: {score:.4f}")
+        
+        # statistics.printlist(args.target_file ,jaccard, 50)
     if args.print_ops:
         ops = list(set([int(e.op) for e in analyzer.expressions[1:]]))
         print(ops)
+    
 
 
     

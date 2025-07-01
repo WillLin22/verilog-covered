@@ -89,7 +89,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=16, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
+    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
         pkl_path = f"./pkl/{code_path.split('/')[-1].split('.')[0]}_{iofile.replace('.', '_')}_analyzer.pkl"
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()
@@ -182,16 +182,18 @@ def get_code_for_sig(expressions, e):
     
     Returns:
         str: code for the signal
+        width
     """
+    width = e.value.width
     if e.op == 1:
-        return e.name
+        return (e.name, width) 
     elif e.op == 35:  # SBIT_SEL
         e_static = expressions[e.left]
-        return e.name + f"[{int(e_static.value.value[0], 16)}]"
+        return (e.name + f"[{int(e_static.value.value[0], 16)}]", width)
     elif e.op == 36:  # MBIT_SEL
         e_left = expressions[e.left]
         e_right = expressions[e.right]
-        return e.name + f"[{int(e_left.value.value[0], 16)}:{int(e_right.value.value[0], 16)}]"
+        return (e.name + f"[{int(e_left.value.value[0], 16)}:{int(e_right.value.value[0], 16)}]", width)
     
 class statistic():
     """
@@ -219,11 +221,27 @@ class statistic():
         self.a_nfs = nf
         self.a_eps = ep
         self.a_nps = np
+    def analyze(self, function, info_func):
+        lst = [(info_func(e), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0 and info_func(e) != None]
+        lst.sort(key=lambda x: x[-1], reverse=True)
+        return lst
+    def get_var_location_list(self, function):
+        def info_func(expressions, e):
+            return e.name if e != None and e.name != None else None
+        lst = self.analyze(function, info_func=lambda e: info_func(self.expressions, e))
+        exist = []
+        for (name, weight) in lst:
+            if name in exist:
+                lst.remove((name, weight))
+            else:
+                exist.append(name)
+        return lst
     def printlist(self, target_file, function ,total):
+        def info_func(expressions, e):
+            return (get_code_for_sig(expressions, e) if e.name != None else 'None', e.op, e.line, e.col)
+        lst = self.analyze(function, info_func=lambda e: info_func(self.expressions, e))
         cnt = 0
         exist = []
-        lst = [((get_code_for_sig(self.expressions, e) if e.name != None else 'None', e.op, e.line, e.col), function(self.a_efs[j], self.a_nfs[j], self.a_eps[j], self.a_nps[j])) for j, e in enumerate(self.expressions) if j != 0]
-        lst.sort(key=lambda x: x[-1], reverse=True)
         with open(f"results_{target_file.split(".")[0]}_{function.__name__}.txt", "w+") as f:
             for (name, op, line, col), val in lst:
                 if name in exist: # or op != 1 or name in exist: # EXP_OP.SIG = 1
@@ -456,7 +474,7 @@ class modify_code():
                 if len(sig_list) > 4 or len(sig_list) == 0:
                     continue
                 sig_list = list(sig_list)
-                cond_list = [[f"{sig} == 0", f"{sig} == ~0"] for sig in sig_list]
+                cond_list = [[f"{sig} == {w}'b0", f"{sig} == ~{w}'b0"] for sig, w in sig_list]
                 import itertools
                 cond_list = [list(x) for x in itertools.product(*cond_list)]
                 n = len(sig_list)
@@ -488,29 +506,44 @@ class modify_code():
         def last_order_traversal(self, e, cnt, added_var_dict, var_name, var_width):
             """
             return:
-                (level, var_cnt, width, code_for_this_part)
+                (level, var_cnt, width, code_for_this_part, op)
                 level: int, the level of the node in the tree
                 var_cnt: int, the number of variables added to the expression
             """
+            def add_var_cond(op):
+                # return op != 49 and op != 26 and op != 38 # LIST, COND_SEL, CONCAT
+                return op == 25 # COND
+            def is_leaf(op):
+                return op == 0 or op == 1 or op == 35 or op == 36
+            def need_brackets(op, lop, rop):
+                lbrackets = not is_leaf(op) and not is_leaf(lop) and lop != 49 and lop != 26 and lop != 38 and lop != op
+                rbrackets = not is_leaf(op) and not is_leaf(rop) and rop != 49 and rop != 26 and rop != 38 and rop != op
+                return lbrackets, rbrackets
             if e == None:
-                return (0, cnt, 0, "")
-            if e.op == 0 or e.op == 1 or e.op == 35 or e.op == 36:
-                return (1, cnt, e.value.width, self.codes[e.line - 1][e.col[0]:e.col[1] + 1])
+                return (0, cnt, 0, "", 0)
+            if is_leaf(e.op):
+                return (1, cnt, e.value.width, self.codes[e.line - 1][e.col[0]:e.col[1] + 1], e.op)
+            op = e.op
             left = self.expressions[e.left] if e.left != 0 else None
             right = self.expressions[e.right] if e.right != 0 else None
             func = self._get_str_from_op(e.op)
-            d1, cnt1, w1, lcode = last_order_traversal(self, left, cnt, added_var_dict, var_name, var_width)
-            d2, cnt , w2, rcode = last_order_traversal(self, right, cnt1, added_var_dict, var_name, var_width)
-            d = max(d1, d2) + 1
+            d1, cnt1, w1, lcode, lop = last_order_traversal(self, left, cnt, added_var_dict, var_name, var_width)
+            d2, cnt , w2, rcode, rop = last_order_traversal(self, right, cnt1, added_var_dict, var_name, var_width)
+            d = max(d1, d2) + add_var_cond(e.op)
+            lbrackets, rbrackets = need_brackets(op, lop, rop)
+            if lbrackets:
+                lcode = "(" + lcode + ")"
+            if rbrackets:
+                rcode = "(" + rcode + ")"
             code, width = func(lcode, rcode, w1, w2)
-            if d > 1 and e.op != 49 and e.op != 26 and e.op != 38: # LIST, COND_SEL, CONCAT
+            if d > 1 and add_var_cond(e.op):
                 new_var_name = f"{var_name}_{cnt}"
                 added_var_dict[new_var_name] = (code, width)
                 code = new_var_name
                 cnt = cnt + 1
-            if e.op == 49 or e.op == 26 or e.op == 38: # LIST
-                d = d - 1
-            return (d, cnt, width, code)
+                op = 1
+            
+            return (d, cnt, width, code, op)
         modified = []
         appeared_vars = set()
         for i, e in enumerate(self.expressions[1:]):
@@ -521,7 +554,7 @@ class modify_code():
                 name = left.name
                 width = left.value.width
                 start_line, end_line = self._get_range(i, e)
-                _, _, _, rcode = last_order_traversal(self, right, 0, added_var_dict, name, width)
+                _, _, _, rcode, _ = last_order_traversal(self, right, 0, added_var_dict, name, width)
                 if rcode in added_var_dict:
                     rcode0 = rcode
                     rcode, _ = added_var_dict[rcode]
@@ -537,9 +570,8 @@ class modify_code():
                 
                     
     
-            
-                    
-            
+
+
             
 
 
