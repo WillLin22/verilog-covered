@@ -98,7 +98,7 @@ class Fault_Locate_Analyzer():
         self.vars = [var for var, _ in dists.items()]
         self.dists = dists
         self.faulty_var = faulty_var
-        self.sorted_var_lists = sorted(located_var_lists, lambda x: x[1], reverse=True)
+        self.sorted_var_lists = sorted(located_var_lists, key=lambda x: x[1], reverse=True)
         self.vars_limit = vars_limit
         self.dist_factor = dist_factor
     def analyse(self):

@@ -227,7 +227,9 @@ class statistic():
         return lst
     def get_var_location_list(self, function):
         def info_func(expressions, e):
-            return e.name if e != None and e.name != None else None
+            while e.father != None:
+                e = expressions[e.father]
+            return expressions[e.left].name if e.left != 0 else None
         lst = self.analyze(function, info_func=lambda e: info_func(self.expressions, e))
         exist = []
         for (name, weight) in lst:
