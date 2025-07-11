@@ -3,7 +3,8 @@ import argparse
 import os
 import time
 import pickle
-from tools import Assign_Graph, Fault_Locate_Analyzer_Simple
+from tools import *
+import sys
 
 def bitwise_or(str1, str2):
     # 确保两个字符串长度相同
@@ -35,6 +36,13 @@ def D(aef, anf, aep, anp):
 def naish1(aef, anf, aep, anp):
     return -1 if anf > 0 else anp
 
+def is_arg_specified(arg_name):
+    """检查参数是否在命令行中被指定"""
+    for arg in sys.argv[1:]:
+        if arg == arg_name:
+            return True
+    return False
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     code_dir = os.path.dirname(os.path.abspath(__file__)) + "/test/"
@@ -50,6 +58,8 @@ if __name__ == "__main__":
     parser.add_argument('--get-time', action='store_true', help='Get time of analysis')
     parser.add_argument('--store', action='store_true', help='Store the analyzer object to a pickle file')
     parser.add_argument('--analyse-only', action='store_true', help='Analyse the result only, do not run the simulation. Conflicted with get_all_ios and get_error_ios')
+    parser.add_argument('--faulty-var', type=str, default='n_carry_out', help='The faulty variable to analyse')
+    parser.add_argument('--analyser-type', type=int, default=2, help='Set the type of analyzer')
     args = parser.parse_args()
     code_path = code_dir + args.target_file
     # "/home/willlin/miniforge3/envs/veribench/bin/iverilog"
@@ -95,15 +105,26 @@ if __name__ == "__main__":
     
     
     if args.analyse_result or args.analyse_only:
+        # def dist_factor(x, d):
+        #     return x * (1 - d*0.1) if d >= 0 and d < 10 else 0
+        def dist_factor(x, d, e=2):
+            """
+            采用非线性的e次函数，距离为0的时候比例为1，距离为10的时候比例为0
+            """
+            return x * (1 - (d / 10) ** e) if d >= 0 and d < 10 else 0            
+        if not is_arg_specified('--faulty-var'):
+            print(f"Warning: No faulty variable specified, using default: {args.faulty_var}")
         graph = Assign_Graph()
         dists = graph.run(analyzer.expressions)
         statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
-        lst = statistics.get_var_location_list(jaccard)
-        fault_analyzer = Fault_Locate_Analyzer_Simple(dists, "n_carry_out", lst, vars_limit=10, dist_factor=0.5)
-        score = fault_analyzer.analyse()
-        print(f"Fault location score: {score:.4f}")
+        func_list = [tarantula, jaccard, ochiai, D, naish1]
+        fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=10, dist_factor=dist_factor, type=args.analyser_type)
+        for func in func_list:
+            lst   = statistics.get_var_location_list(func)
+            statistics.printlist(args.target_file , func, 100)
+            score = fault_analyzer.analyse(args.faulty_var, lst)
+            print(f"Fault location score for func {func.__name__}: {score:.4f}")
         
-        # statistics.printlist(args.target_file ,jaccard, 50)
     if args.print_ops:
         ops = list(set([int(e.op) for e in analyzer.expressions[1:]]))
         print(ops)

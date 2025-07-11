@@ -5,6 +5,7 @@ from joblib import Parallel, delayed
 from CDDAnalyzer import CDDAnalyzer
 import time
 import pickle
+from tools import *
 
 
 def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
@@ -268,6 +269,7 @@ class modify_code():
         self.expressions = expressions
         self.codes = codes
         self.output_path = output_path
+        self.outputs = self._get_output_sigs()
     def traverse_ast(self, expressions, root, val_list:list[str]):
         """_summary_
 
@@ -295,109 +297,116 @@ class modify_code():
             v2 = self.traverse_ast(expressions, e.right, val_list)
             return self.update_value(e.op, v1, v2)
     def update_value(self, op, vleft, vright):
-            is_output_bool = False #是否输出为bool值，是的话将width改为1
-            single = False # 是否为单目运算符，如果是的话仅使用右值
-            others = False # 其他情况
+        """
+        return:
+            tuple(int, int): var value and var width
+        """
+        is_output_bool = False #是否输出为bool值，是的话将width改为1
+        single = False # 是否为单目运算符，如果是的话仅使用右值
+        others = False # 其他情况
+        match op:
+            case 2: # XOR
+                op = lambda x, y: x ^ y
+            case 3: 
+                op = lambda x, y: x * y
+            case 4:
+                op = lambda x, y: x // y
+            case 5:
+                op = lambda x, y: x % y
+            case 6:
+                op = lambda x, y: x + y
+            case 7:
+                op = lambda x, y: x - y
+            case 8:
+                op = lambda x, y: x & y
+            case 9:
+                op = lambda x, y: x | y
+            case 10:
+                op = lambda x, y: ~(x & y)
+            case 11:
+                op = lambda x, y: ~(x | y)
+            case 12:
+                op = lambda x, y: ~(x ^ y)
+            case 13:
+                op = lambda x, y: x < y
+                is_output_bool = True
+            case 14:
+                op = lambda x, y: x > y
+                is_output_bool = True
+            case 15:
+                op = lambda x, y: x << y
+                is_output_bool = False
+            case 16:
+                op = lambda x, y: x >> y
+                is_output_bool = False
+            case 17:
+                op = lambda x, y: x == y
+                is_output_bool = True
+            case 18:
+                op = lambda x, y: x == y
+                is_output_bool = True
+            case 19:
+                op = lambda x, y:  x <= y
+                is_output_bool = True
+            case 20:
+                op = lambda x, y: x >= y
+                is_output_bool = True
+            case 21:
+                op = lambda x, y: x != y
+                is_output_bool = True
+            case 22:
+                op = lambda x, y: x != y
+                is_output_bool = True
+            case 23:
+                op = lambda x, y: x or y
+                is_output_bool = True
+            case 24:
+                op = lambda x, y: x and y
+                is_output_bool = True
+            case 29:
+                op = lambda x: not x
+                is_output_bool = True
+                single = True
+            case 30:
+                op = lambda x: x != 0
+                is_output_bool = True
+                single = True
+            case _:
+                others = True
+        ret = tuple()
+        width = int()
+        if others:
             match op:
-                case 2: # XOR
-                    op = lambda x, y: x ^ y
-                case 3: 
-                    op = lambda x, y: x * y
-                case 4:
-                    op = lambda x, y: x // y
-                case 5:
-                    op = lambda x, y: x % y
-                case 6:
-                    op = lambda x, y: x + y
-                case 7:
-                    op = lambda x, y: x - y
-                case 8:
-                    op = lambda x, y: x & y
-                case 9:
-                    op = lambda x, y: x | y
-                case 10:
-                    op = lambda x, y: ~(x & y)
-                case 11:
-                    op = lambda x, y: ~(x | y)
-                case 12:
-                    op = lambda x, y: ~(x ^ y)
-                case 13:
-                    op = lambda x, y: x < y
-                    is_output_bool = True
-                case 14:
-                    op = lambda x, y: x > y
-                    is_output_bool = True
-                case 15:
-                    op = lambda x, y: x << y
-                    is_output_bool = False
-                case 16:
-                    op = lambda x, y: x >> y
-                    is_output_bool = False
-                case 17:
-                    op = lambda x, y: x == y
-                    is_output_bool = True
-                case 18:
-                    op = lambda x, y: x == y
-                    is_output_bool = True
-                case 19:
-                    op = lambda x, y:  x <= y
-                    is_output_bool = True
-                case 20:
-                    op = lambda x, y: x >= y
-                    is_output_bool = True
-                case 21:
-                    op = lambda x, y: x != y
-                    is_output_bool = True
-                case 22:
-                    op = lambda x, y: x != y
-                    is_output_bool = True
-                case 23:
-                    op = lambda x, y: x or y
-                    is_output_bool = True
-                case 24:
-                    op = lambda x, y: x and y
-                    is_output_bool = True
-                case 29:
-                    op = lambda x: not x
-                    is_output_bool = True
-                    single = True
-                case 30:
-                    op = lambda x: x != 0
-                    is_output_bool = True
-                    single = True
-                case _:
-                    others = True
-            ret = tuple()
-            width = int()
-            if others:
-                match op:
-                    case 26: # COND_SEL
-                        ret = ((vleft[0], vright[0]), max(vleft[1], vright[1]))
-                    case 25: # COND
-                        ret = (vright[0][0] if vleft[0] else vright[0][1], vright[1])
-                    case 27: # UINV
-                        ret = (2**vright[1] - 1 - vright[0], vright[1])
-                    case 28: # UAND
-                        ret = (vright[0] == 2 ** vright[1] - 1, 1)
-                    case 49: # LIST
-                        ret = (vleft[0] * (2** vright[1]) + vright[0], vleft[1] + vright[1])
-                    case 38: # CONCAT
-                        ret = (vright[0], vright[1])
-                        
+                case 26: # COND_SEL
+                    ret = ((vleft[0], vright[0]), max(vleft[1], vright[1]))
+                case 25: # COND
+                    ret = (vright[0][0] if vleft[0] else vright[0][1], vright[1])
+                case 27: # UINV
+                    ret = (2**vright[1] - 1 - vright[0], vright[1])
+                case 28: # UAND
+                    ret = (vright[0] == 2 ** vright[1] - 1, 1)
+                case 49: # LIST
+                    ret = (vleft[0] * (2** vright[1]) + vright[0], vleft[1] + vright[1])
+                case 38: # CONCAT
+                    ret = (vright[0], vright[1])
+                    
+        else:
+            if is_output_bool:
+                width = 1
+            elif single:
+                width = vright[1]
             else:
-                if is_output_bool:
-                    width = 1
-                elif single:
-                    width = vright[1]
-                else:
-                    width = max(vleft[1], vright[1])
-                if single:
-                    ret = (op(vright[0]), width)
-                else:
-                    ret = (op(vleft[0], vright[0]), width) 
-            return ret  
+                width = max(vleft[1], vright[1])
+            if single:
+                ret = (op(vright[0]), width)
+            else:
+                ret = (op(vleft[0], vright[0]), width) 
+        return ret  
             
     def _get_range(self, idx, e):
+        """
+        Return the range codes[start:end] for a existing assignment
+        """
         start_line = e.line - 1
         end_line = int()
         if idx == len(self.expressions)-1:
@@ -408,6 +417,16 @@ class modify_code():
                 line += 1
             end_line = line + 1
         return start_line, end_line
+    def _get_output_sigs(self):
+        outputs = []
+        for code in self.codes:
+            code = code.strip().split(',')
+            for sig in code:
+                sig = sig.strip().split(' ')
+                if sig[0].strip() == 'output':
+                    outputs.append(sig[-1])
+        print(f"Debug: outputs: {outputs}")
+        return outputs
     def _get_str_from_op(self, op):
         match op:
             case 2: return  lambda x, y, xw, yw: (f"{x} ^ {y}",max(xw, yw))
@@ -489,12 +508,16 @@ class modify_code():
                 res_rcodes += rcodes
                 modified.append([start_line, end_line, lcodes + '=' + res_rcodes + ';\n', 0])
         self._output_modified_code(modified)
-    def _output_modified_code(self, modified):
+    def _output_modified_code(self, modified, append=False, append_code=None):
         """
         modified: [[start_line, end_line, code, 0], ...]
+        append: append append_code to the file
+        append_code: if append is set to fault it is not used
         """
         with open(self.output_path, 'w+') as f:
             for lineno, code in enumerate(self.codes):
+                if append == True and code.strip().startswith('endmodule'):
+                    f.write(append_code)
                 is_modified = [1 if lineno >= r[0] and lineno < r[1] else 0 for r in modified]
                 if sum(is_modified) != 0:
                     index = next((i for i, x in enumerate(is_modified) if x == 1), -1)
@@ -505,6 +528,9 @@ class modify_code():
                     f.write(code + '\n')
             
     def add_variables(self):
+        """
+        Used to add intermediate variables for expressions
+        """
         def last_order_traversal(self, e, cnt, added_var_dict, var_name, var_width):
             """
             return:
@@ -512,9 +538,10 @@ class modify_code():
                 level: int, the level of the node in the tree
                 var_cnt: int, the number of variables added to the expression
             """
-            def add_var_cond(op):
+            def add_var_cond(op, fop):
                 # return op != 49 and op != 26 and op != 38 # LIST, COND_SEL, CONCAT
-                return op == 25 # COND
+                # return op == 25 # COND
+                return not is_leaf(op) and fop != 49 and fop != 38 and not (fop == 25 and op == 26) and fop != op
             def is_leaf(op):
                 return op == 0 or op == 1 or op == 35 or op == 36
             def need_brackets(op, lop, rop):
@@ -528,17 +555,19 @@ class modify_code():
             op = e.op
             left = self.expressions[e.left] if e.left != 0 else None
             right = self.expressions[e.right] if e.right != 0 else None
+            fa = self.expressions[e.father] if e.father != None else None
+            faop = fa.op if fa != None else 0
             func = self._get_str_from_op(e.op)
             d1, cnt1, w1, lcode, lop = last_order_traversal(self, left, cnt, added_var_dict, var_name, var_width)
             d2, cnt , w2, rcode, rop = last_order_traversal(self, right, cnt1, added_var_dict, var_name, var_width)
-            d = max(d1, d2) + add_var_cond(e.op)
+            d = max(d1, d2) + add_var_cond(e.op, faop)
             lbrackets, rbrackets = need_brackets(op, lop, rop)
             if lbrackets:
                 lcode = "(" + lcode + ")"
             if rbrackets:
                 rcode = "(" + rcode + ")"
             code, width = func(lcode, rcode, w1, w2)
-            if d > 1 and add_var_cond(e.op):
+            if d > 1 and add_var_cond(e.op, faop):
                 new_var_name = f"{var_name}_{cnt}"
                 added_var_dict[new_var_name] = (code, width)
                 code = new_var_name
@@ -565,10 +594,27 @@ class modify_code():
                 sel = lambda width : f"[{width-1}:0]" if width > 1 else ""
                 for k, (v, w) in added_var_dict.items():
                     code += f"wire {sel(w)}{k} = {v};\n"
-                begin = f"wire {sel(width)}" if name not in appeared_vars else "assign "
+                begin = f"wire {sel(width)}" if name not in appeared_vars and name not in self.outputs else "assign "
                 code += f"{begin}{name} = {rcode};\n"
                 modified.append([start_line, end_line, code, 0])
         self._output_modified_code(modified)
+    def evaluate_every_bit(self):
+        """
+        Used to add vars to check every existing bit and write it into runnable verilog code
+        """
+        graph_tool = Assign_Graph()
+        vars = graph_tool.get_vars(self.expressions, get_width=True)
+        prefix = 'bits_check'
+        code = ''
+        for vname, vwid in vars:
+            if vwid == 1:
+                code += f'wire {prefix}_{vname} = {vname};\n'
+            else:
+                for i in range(vwid):
+                    code += f'wire {prefix}_{vname}_{i} = {vname}[{i}];\n'
+        self._output_modified_code([], append=True, append_code=code)
+                
+        
                 
                     
     

@@ -1,18 +1,21 @@
 class Assign_Graph():
     """
-    生成assign图
+    生成assign图，同时内部各功能独立，可以作为单独的工具类来进行复用
     """
-    def get_vars(self, expressions):
+    def get_vars(self, expressions, get_width=False):
         """
         A list that contains all the variable names in the code, each for exactly once
         
         Returns:
-            list: a list of variable names
+            list: a list of variable names or (var_name, var_width) if get_width is set to true
+            
         """
         vars = set()
+        vars_with_width = list()
         for i, e in enumerate(expressions[1:]):
-            if e.name != None:
+            if e.name != None and e.name not in vars:
                 vars.add(e.name)
+                vars_with_width.append((e.name, e.value.width))
         return list(vars)
     
     def ast_traversal(self, e, expressions, get_ls=lambda e, tr: tr[e.left] if e.left != 0 else None, get_rs=lambda e, tr:tr[e.right] if e.right != 0 else None, info_func=lambda x: x):
@@ -57,7 +60,7 @@ class Assign_Graph():
         Returns:
             dict:dict[v1name: dict[v2name, dist]], a dict that contains the distance between each pair of variables
         """
-        dists = {var: {v: float('inf') for v in vars} for var in vars}
+        dists = {var: {v: float('inf') if v != var else 0 for v in vars} for var in vars}
         updated = []
         def update_dists(v, adj_list):
             next_vars = adj_list[v]
@@ -86,22 +89,54 @@ class Assign_Graph():
         dists = self.get_dists_between_vars(vars, adj_list)
         return dists
 
-class Fault_Locate_Analyzer():
-    def __init__(self, dists, faulty_var, located_var_lists, vars_limit=10, dist_factor=0.5):
+class Fault_Locate_Analyzer_Factory():
+    """
+    A factory class that creates a Fault_Locate_Analyzer object based on the given type.
+    """
+    def create(self, dists, vars_limit=10, dist_factor=lambda x, d: x * 0.9 ** d if d != float('inf') else 0, type=3):
         """
         Args:
-            dists (dict[str, Dict[str, int]]): the distance between each pair of variables.
+            dists (dict[str, Dict[str, int]]): the distance between each pair of variables. If assign v1 = v2, then
+                dists[v1][v2] = 1, dists[v2][v1] = -1, and dists[v1][v1] = 0.
             faulty_var (str): the name of the faulty variable.
             located_var_lists (list[tuple(str, int)]): a list of varname and its weight in the analysis.
             vars_limit (int): the number of variables to be considered in the analysis, default is 10.
+            dist_factor (function(score, dist) : float): a function that takes the score and distance as input and returns a float.
+            type (int): the type of the Fault_Locate_Analyzer to be created, default is 3.
+        """
+        analyzer = object()
+        if type == 1:
+            analyzer = Fault_Locate_Analyzer_Simple(dists, vars_limit, dist_factor)
+        elif type == 2:
+            analyzer = Fault_Locate_Analyzer_2(dists, vars_limit, dist_factor)
+        elif type == 3:
+            analyzer = Fault_Locate_Analyzer_3(dists, vars_limit, dist_factor)
+        else:
+            raise ValueError(f"Invalid type: {type}. Must be 1, 2 or 3.")
+        return analyzer
+
+class Fault_Locate_Analyzer():
+    def __init__(self, dists, vars_limit=10, dist_factor=lambda x, d: x * 0.9 ** d if d != float('inf') else 0):
+        """
+        Args:
+            dists (dict[str, Dict[str, int]]): the distance between each pair of variables. If assign v1 = v2, then
+                dists[v1][v2] = 1, dists[v2][v1] = -1, and dists[v1][v1] = 0.
+            faulty_var (str): the name of the faulty variable.
+            located_var_lists (list[tuple(str, int)]): a list of varname and its weight in the analysis.
+            vars_limit (int): the number of variables to be considered in the analysis, default is 10.
+            dist_factor (function(score, dist) : float): a function that takes the score and distance as input and returns a float.
         """
         self.vars = [var for var, _ in dists.items()]
         self.dists = dists
-        self.faulty_var = faulty_var
-        self.sorted_var_lists = sorted(located_var_lists, key=lambda x: x[1], reverse=True)
         self.vars_limit = vars_limit
         self.dist_factor = dist_factor
-    def analyse(self):
+    def error_handler(self):
+        error = self.faulty_var not in self.vars
+        if error:
+            print(f'Error: You did not give a faulty var name or the name is invalid! Faulty var name: {self.faulty_var}')
+            return False
+        return True
+    def analyse(self, faulty_var, located_var_lists):
         """
         Analyse how good the current fault location is and return a score based on the top n located variables and its weight.
         
@@ -112,12 +147,48 @@ class Fault_Locate_Analyzer():
     
     
 class Fault_Locate_Analyzer_Simple(Fault_Locate_Analyzer):
-    def analyse(self):
+    def analyse(self, faulty_var, located_var_lists):
+        self.faulty_var = faulty_var
+        if not self.error_handler():
+            return 0.0
+        self.sorted_var_lists = sorted(located_var_lists, key=lambda x: x[1], reverse=True)
         score = {var: 0 for var in self.vars}
         for i, (var, weight) in enumerate(self.sorted_var_lists[:self.vars_limit]):
             score[var] += weight
             for v, dist in self.dists[var].items():
                 if dist != float('inf') and dist > 0:
-                    score[v] += weight * self.dist_factor**dist
+                    score[v] += self.dist_factor(weight, dist)
                     
         return score[self.faulty_var] / sum([s for _, s in score.items()])
+class Fault_Locate_Analyzer_2(Fault_Locate_Analyzer):
+    """base score: weight / max weight
+    get the best score from the top self.vars_limit variables considering its distance with self.dist_factor(score, dist)
+    """
+    def analyse(self, faulty_var, located_var_lists):
+        self.faulty_var = faulty_var
+        if not self.error_handler():
+            return 0.0
+        self.sorted_var_lists = sorted(located_var_lists, key=lambda x: x[1], reverse=True)
+        return max(self.dist_factor(w/max(w for (s, w) in self.sorted_var_lists[:self.vars_limit]), abs(self.dists[s][self.faulty_var])) for (s, w) in self.sorted_var_lists[:self.vars_limit] if s in self.dists and self.faulty_var in self.dists[s] and self.dists[s][self.faulty_var] != float('inf'))
+    
+    
+class Fault_Locate_Analyzer_3(Fault_Locate_Analyzer):
+    """
+    Get the closest result from the top self.vars_limit variables and return its score.
+    The base score is weight/max(weight)
+    """
+    def analyse(self, faulty_var, located_var_lists):
+        self.faulty_var = faulty_var
+        if not self.error_handler():
+            return 0.0
+        self.sorted_var_lists = sorted(located_var_lists, key=lambda x: x[1], reverse=True)
+        max_weight = max(w for (_, w) in self.sorted_var_lists[:self.vars_limit])
+        min_dist = float('inf')
+        min_index = -1
+        for i, dist in enumerate([abs(self.dists[self.faulty_var][s]) for (s, _) in self.sorted_var_lists[:self.vars_limit] if s in self.dists and self.faulty_var in self.dists[s]]):
+            if dist < min_dist:
+                min_dist = dist
+                min_index = i
+        if min_index == -1:
+            print('Warning: You have got results with no fault localization even close to the correct var! Maybe you should increase your vars_limit?')
+        return self.dist_factor(self.sorted_var_lists[min_index][1] / max_weight, min_dist) if min_index != -1 else 0.0 
