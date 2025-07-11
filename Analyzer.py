@@ -90,7 +90,7 @@ def _job(vvp, temp_dir, io, code_path, function, only_parse=False):
 
 
 class Analyzer():
-    def __init__(self, code_path, function, n_jobs=32, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
+    def __init__(self, code_path, function, n_jobs=128, iverilog="iverilog", iofile=None, store_results=True, load_results=False):
         pkl_path = f"./pkl/{code_path.split('/')[-1].split('.')[0]}_{iofile.replace('.', '_')}_analyzer.pkl"
         with open(code_path, 'r') as f:
             self.codes = f.read().splitlines()

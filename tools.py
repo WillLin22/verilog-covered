@@ -1,3 +1,6 @@
+import argparse
+import os
+import time
 class Assign_Graph():
     """
     生成assign图，同时内部各功能独立，可以作为单独的工具类来进行复用
@@ -88,6 +91,62 @@ class Assign_Graph():
         adj_list = self.get_adj_list(vars, expressions)
         dists = self.get_dists_between_vars(vars, adj_list)
         return dists
+    
+class MyParser(argparse.ArgumentParser):
+    """
+    A helper for controling parsing tasks
+    """
+    def __init__(self):
+        super().__init__()
+        # self.add_argument('--target-file', type=str, default="fadd32_11.v",  help='Target verilog file')
+        self.add_argument('--target-files', nargs="*", default=["fadd32_11.v"], help='Target verilog files')
+        self.add_argument('--iverilog', type=str, default='iverilog', help='iverilog executable')
+        self.add_argument('--get-error-ios', action='store_true', help='Get error IOs')
+        self.add_argument('--get-all-ios', action='store_true', help='Get all IOs')
+        self.add_argument('--get-modified-code', action='store_true', help='Get modified code')
+        self.add_argument('--add-variables', action='store_true', help='Add middle vars into code')
+        self.add_argument('--analyse-result', action='store_true', help='Run the simulation and analyse the result')
+        self.add_argument('--print-ops', action='store_true', help='Print all operations in the code')
+        self.add_argument('--ios', default=None, type=str, help='IOs file to read')
+        self.add_argument('--get-time', action='store_true', help='Get time of analysis')
+        self.add_argument('--store', action='store_true', help='Store the analyzer object to a pickle file')
+        self.add_argument('--analyse-only', action='store_true', help='Analyse the result only, do not run the simulation. Conflicted with get_all_ios and get_error_ios')
+        self.add_argument('--faulty-vars', nargs='*', default=['n_carry_out'], help='The faulty variable to analyse')
+        self.add_argument('--analyser-type', type=int, default=2, help='Set the type of analyzer')
+    def output_ios(self, ios, output_file="fadd32_ios"):
+        with open(output_file, "w+") as f:
+            for io in ios:
+                f.write(f"{io[0][0]} {io[0][1]} {io[0][2]} {io[0][3]} {io[0][4]} \t# {io[1]} {io[2]}\n")
+        print(f"IOs saved to {output_file}")
+        
+class Output_helper():
+    """
+    A safer helper class to write into file
+    """
+    def __init__(self, output_file_name):
+        """
+        Prepare a output path for writing. If the ./output directory is not 
+        exist, create it. If there is already a file with the same name, back
+        it up with name `output_file_name_date_time.bak`.
+        """
+        self.output_file_name = output_file_name
+        self.output_dir = "./output/"
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        self.output_path = os.path.join(self.output_dir, self.output_file_name)
+        if os.path.exists(self.output_path):
+            backup_path = f"{self.output_path}_{time.strftime('%Y%m%d_%H%M%S')}.bak"
+            os.rename(self.output_path, backup_path)
+            print(f"Warning: You are about to overwrite an existing file. Backup existing file to {backup_path}")
+    def write(self, output, mode):
+        with open(self.output_path, mode) as f:
+            if isinstance(output, str):
+                f.write(output)
+            elif isinstance(output, list):
+                for line in output:
+                    f.write(line + "\n")
+            else:
+                raise TypeError("Output must be a string or a list of strings.")
 
 class Fault_Locate_Analyzer_Factory():
     """
