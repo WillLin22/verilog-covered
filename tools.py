@@ -228,7 +228,7 @@ class Fault_Locate_Analyzer_2(Fault_Locate_Analyzer):
         if not self.error_handler():
             return 0.0
         self.sorted_var_lists = sorted(located_var_lists, key=lambda x: x[1], reverse=True)
-        return max(self.dist_factor(w/max(w for (s, w) in self.sorted_var_lists[:self.vars_limit]), abs(self.dists[s][self.faulty_var])) for (s, w) in self.sorted_var_lists[:self.vars_limit] if s in self.dists and self.faulty_var in self.dists[s] and self.dists[s][self.faulty_var] != float('inf'))
+        return max(self.dist_factor(w/max(w for (s, w) in self.sorted_var_lists[:self.vars_limit]), abs(self.dists[s][self.faulty_var])) if s in self.dists and self.faulty_var in self.dists[s] and self.dists[s][self.faulty_var] != float('inf') else 0 for (s, w) in self.sorted_var_lists[:self.vars_limit])
     
     
 class Fault_Locate_Analyzer_3(Fault_Locate_Analyzer):
