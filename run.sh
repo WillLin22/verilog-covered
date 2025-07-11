@@ -11,7 +11,7 @@ source ./env.sh
 python main.py --target-files $files --ios $io100 --get-modified-code
 mv -f ./fadd32_* ./test
 modified_files=$(echo $files | sed 's/\.v/_modified.v/g')
-python main.py --target-files $files --ios $io100 --add-variables
+python main.py --target-files $modified_files --ios $io100 --add-variables
 
 for file in fadd32_*_modified_modified.v; do
     if [ -f "$file" ]; then
@@ -22,3 +22,4 @@ for file in fadd32_*_modified_modified.v; do
 done
 modified_files_2=$(echo $modified_files | sed 's/_modified\.v/_modified2.v/g')
 python main.py --target-files fadd32_1_modified0_2.v $modified_files_2 --ios $io10000 --store --analyse-result --faulty-vars n_carry_out $faulty_vars
+tar -czvf output.tar.gz output
