@@ -1,0 +1,444 @@
+//1:“尾数全1，舍入进位，指数加1处理”没有考虑
+module FADD(
+  input  [31:0] io_a,
+  input  [31:0] io_b,
+  input  [2:0]  io_rm,
+  output [31:0] io_result,
+  output [4:0]  io_fflags
+);
+
+  // Sub-module 1: Component Extraction
+wire sign_a_0 = (io_a[31] == (~1'b0)) ? 1'h1 : io_a[31];
+wire sign_a = (io_a[31] == 1'b0) ? 1'h0 : sign_a_0;
+wire sign_b_0 = (io_b[31] == (~1'b0)) ? 1'h1 : io_b[31];
+wire sign_b = (io_b[31] == 1'b0) ? 1'h0 : sign_b_0;
+wire [7:0]exp_a_0 = (io_a[30:23] == (~8'b0)) ? 8'hff : io_a[30:23];
+wire [7:0]exp_a = (io_a[30:23] == 8'b0) ? 8'h0 : exp_a_0;
+wire [7:0]exp_b_0 = (io_b[30:23] == (~8'b0)) ? 8'hff : io_b[30:23];
+wire [7:0]exp_b = (io_b[30:23] == 8'b0) ? 8'h0 : exp_b_0;
+wire [22:0]mant_a_0 = (io_a[22:0] == (~23'b0)) ? 23'h7fffff : io_a[22:0];
+wire [22:0]mant_a = (io_a[22:0] == 23'b0) ? 23'h0 : mant_a_0;
+wire [22:0]mant_b_0 = (io_b[22:0] == (~23'b0)) ? 23'h7fffff : io_b[22:0];
+wire [22:0]mant_b = (io_b[22:0] == 23'b0) ? 23'h0 : mant_b_0;
+
+  // Sub-module 2: Classification of Operands
+wire is_normal_a_0 = ((mant_a == (~23'b0)) && (exp_a == (~8'b0))) ? 1'h1 : ((exp_a != 8'b0) && (mant_a != 23'b0));
+wire is_normal_a_1 = ((mant_a == (~23'b0)) && (exp_a == 8'b0)) ? 1'h0 : is_normal_a_0;
+wire is_normal_a_2 = ((mant_a == 23'b0) && (exp_a == (~8'b0))) ? 1'h0 : is_normal_a_1;
+wire is_normal_a = ((mant_a == 23'b0) && (exp_a == 8'b0)) ? 1'h0 : is_normal_a_2;
+wire is_normal_b_0 = ((mant_b == (~23'b0)) && (exp_b == (~8'b0))) ? 1'h1 : ((exp_b != 8'b0) && (mant_b != 23'b0));
+wire is_normal_b_1 = ((mant_b == (~23'b0)) && (exp_b == 8'b0)) ? 1'h0 : is_normal_b_0;
+wire is_normal_b_2 = ((mant_b == 23'b0) && (exp_b == (~8'b0))) ? 1'h0 : is_normal_b_1;
+wire is_normal_b = ((mant_b == 23'b0) && (exp_b == 8'b0)) ? 1'h0 : is_normal_b_2;
+wire is_subnormal_a_0 = ((mant_a == (~23'b0)) && (exp_a == (~8'b0))) ? 1'h0 : ((exp_a == 8'b0) && (mant_a != 23'b0));
+wire is_subnormal_a_1 = ((mant_a == (~23'b0)) && (exp_a == 8'b0)) ? 1'h1 : is_subnormal_a_0;
+wire is_subnormal_a_2 = ((mant_a == 23'b0) && (exp_a == (~8'b0))) ? 1'h0 : is_subnormal_a_1;
+wire is_subnormal_a = ((mant_a == 23'b0) && (exp_a == 8'b0)) ? 1'h0 : is_subnormal_a_2;
+wire is_subnormal_b_0 = ((mant_b == (~23'b0)) && (exp_b == (~8'b0))) ? 1'h0 : ((exp_b == 8'b0) && (mant_b != 23'b0));
+wire is_subnormal_b_1 = ((mant_b == (~23'b0)) && (exp_b == 8'b0)) ? 1'h1 : is_subnormal_b_0;
+wire is_subnormal_b_2 = ((mant_b == 23'b0) && (exp_b == (~8'b0))) ? 1'h0 : is_subnormal_b_1;
+wire is_subnormal_b = ((mant_b == 23'b0) && (exp_b == 8'b0)) ? 1'h0 : is_subnormal_b_2;
+wire is_zero_a_0 = ((mant_a == (~23'b0)) && (exp_a == (~8'b0))) ? 1'h0 : ((exp_a == 8'b0) && (mant_a == 23'b0));
+wire is_zero_a_1 = ((mant_a == (~23'b0)) && (exp_a == 8'b0)) ? 1'h0 : is_zero_a_0;
+wire is_zero_a_2 = ((mant_a == 23'b0) && (exp_a == (~8'b0))) ? 1'h0 : is_zero_a_1;
+wire is_zero_a = ((mant_a == 23'b0) && (exp_a == 8'b0)) ? 1'h1 : is_zero_a_2;
+wire is_zero_b_0 = ((mant_b == (~23'b0)) && (exp_b == (~8'b0))) ? 1'h0 : ((exp_b == 8'b0) && (mant_b == 23'b0));
+wire is_zero_b_1 = ((mant_b == (~23'b0)) && (exp_b == 8'b0)) ? 1'h0 : is_zero_b_0;
+wire is_zero_b_2 = ((mant_b == 23'b0) && (exp_b == (~8'b0))) ? 1'h0 : is_zero_b_1;
+wire is_zero_b = ((mant_b == 23'b0) && (exp_b == 8'b0)) ? 1'h1 : is_zero_b_2;
+wire is_inf_a_0 = ((mant_a == (~23'b0)) && (exp_a == (~8'b0))) ? 1'h0 : ((exp_a == 8'hFF) && (mant_a == 23'b0));
+wire is_inf_a_1 = ((mant_a == (~23'b0)) && (exp_a == 8'b0)) ? 1'h0 : is_inf_a_0;
+wire is_inf_a_2 = ((mant_a == 23'b0) && (exp_a == (~8'b0))) ? 1'h1 : is_inf_a_1;
+wire is_inf_a = ((mant_a == 23'b0) && (exp_a == 8'b0)) ? 1'h0 : is_inf_a_2;
+wire is_inf_b_0 = ((mant_b == (~23'b0)) && (exp_b == (~8'b0))) ? 1'h0 : ((exp_b == 8'hFF) && (mant_b == 23'b0));
+wire is_inf_b_1 = ((mant_b == (~23'b0)) && (exp_b == 8'b0)) ? 1'h0 : is_inf_b_0;
+wire is_inf_b_2 = ((mant_b == 23'b0) && (exp_b == (~8'b0))) ? 1'h1 : is_inf_b_1;
+wire is_inf_b = ((mant_b == 23'b0) && (exp_b == 8'b0)) ? 1'h0 : is_inf_b_2;
+wire is_nan_a_0 = ((mant_a == (~23'b0)) && (exp_a == (~8'b0))) ? 1'h1 : ((exp_a == 8'hFF) && (mant_a != 23'b0));
+wire is_nan_a_1 = ((mant_a == (~23'b0)) && (exp_a == 8'b0)) ? 1'h0 : is_nan_a_0;
+wire is_nan_a_2 = ((mant_a == 23'b0) && (exp_a == (~8'b0))) ? 1'h0 : is_nan_a_1;
+wire is_nan_a = ((mant_a == 23'b0) && (exp_a == 8'b0)) ? 1'h0 : is_nan_a_2;
+wire is_nan_b_0 = ((mant_b == (~23'b0)) && (exp_b == (~8'b0))) ? 1'h1 : ((exp_b == 8'hFF) && (mant_b != 23'b0));
+wire is_nan_b_1 = ((mant_b == (~23'b0)) && (exp_b == 8'b0)) ? 1'h0 : is_nan_b_0;
+wire is_nan_b_2 = ((mant_b == 23'b0) && (exp_b == (~8'b0))) ? 1'h0 : is_nan_b_1;
+wire is_nan_b = ((mant_b == 23'b0) && (exp_b == 8'b0)) ? 1'h0 : is_nan_b_2;
+wire is_Snan_a_0 = ((is_nan_a == (~1'b0)) && (io_a[22] == (~1'b0))) ? 1'h0 : (is_nan_a && (!io_a[22]));
+wire is_Snan_a_1 = ((is_nan_a == (~1'b0)) && (io_a[22] == 1'b0)) ? 1'h1 : is_Snan_a_0;
+wire is_Snan_a_2 = ((is_nan_a == 1'b0) && (io_a[22] == (~1'b0))) ? 1'h0 : is_Snan_a_1;
+wire is_Snan_a = ((is_nan_a == 1'b0) && (io_a[22] == 1'b0)) ? 1'h0 : is_Snan_a_2;
+wire is_Snan_b_0 = ((is_nan_b == (~1'b0)) && (io_b[22] == (~1'b0))) ? 1'h0 : (is_nan_b && (!io_b[22]));
+wire is_Snan_b_1 = ((is_nan_b == (~1'b0)) && (io_b[22] == 1'b0)) ? 1'h1 : is_Snan_b_0;
+wire is_Snan_b_2 = ((is_nan_b == 1'b0) && (io_b[22] == (~1'b0))) ? 1'h0 : is_Snan_b_1;
+wire is_Snan_b = ((is_nan_b == 1'b0) && (io_b[22] == 1'b0)) ? 1'h0 : is_Snan_b_2;
+
+
+  // Sub-module 3: Handling Special Cases
+wire is_nan = is_nan_a || is_nan_b || (is_inf_a && is_inf_b && (sign_a != sign_b));
+wire is_inf_0 = ((is_nan == (~1'b0)) && (is_inf_a == (~1'b0)) && (is_inf_b == (~1'b0))) ? 1'h0 : ((is_inf_a || is_inf_b) && (!is_nan));
+wire is_inf_1 = ((is_nan == (~1'b0)) && (is_inf_a == (~1'b0)) && (is_inf_b == 1'b0)) ? 1'h0 : is_inf_0;
+wire is_inf_2 = ((is_nan == (~1'b0)) && (is_inf_a == 1'b0) && (is_inf_b == (~1'b0))) ? 1'h0 : is_inf_1;
+wire is_inf_3 = ((is_nan == (~1'b0)) && (is_inf_a == 1'b0) && (is_inf_b == 1'b0)) ? 1'h0 : is_inf_2;
+wire is_inf_4 = ((is_nan == 1'b0) && (is_inf_a == (~1'b0)) && (is_inf_b == (~1'b0))) ? 1'h1 : is_inf_3;
+wire is_inf_5 = ((is_nan == 1'b0) && (is_inf_a == (~1'b0)) && (is_inf_b == 1'b0)) ? 1'h1 : is_inf_4;
+wire is_inf_6 = ((is_nan == 1'b0) && (is_inf_a == 1'b0) && (is_inf_b == (~1'b0))) ? 1'h1 : is_inf_5;
+wire is_inf = ((is_nan == 1'b0) && (is_inf_a == 1'b0) && (is_inf_b == 1'b0)) ? 1'h0 : is_inf_6;
+wire is_both_zero_0 = ((is_zero_b == (~1'b0)) && (sign_a == (~1'b0)) && (is_zero_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : (is_zero_a && is_zero_b && (sign_a == sign_b));
+wire is_both_zero_1 = ((is_zero_b == (~1'b0)) && (sign_a == (~1'b0)) && (is_zero_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_0;
+wire is_both_zero_2 = ((is_zero_b == (~1'b0)) && (sign_a == (~1'b0)) && (is_zero_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_1;
+wire is_both_zero_3 = ((is_zero_b == (~1'b0)) && (sign_a == (~1'b0)) && (is_zero_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_2;
+wire is_both_zero_4 = ((is_zero_b == (~1'b0)) && (sign_a == 1'b0) && (is_zero_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_3;
+wire is_both_zero_5 = ((is_zero_b == (~1'b0)) && (sign_a == 1'b0) && (is_zero_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h1 : is_both_zero_4;
+wire is_both_zero_6 = ((is_zero_b == (~1'b0)) && (sign_a == 1'b0) && (is_zero_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_5;
+wire is_both_zero_7 = ((is_zero_b == (~1'b0)) && (sign_a == 1'b0) && (is_zero_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_6;
+wire is_both_zero_8 = ((is_zero_b == 1'b0) && (sign_a == (~1'b0)) && (is_zero_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_7;
+wire is_both_zero_9 = ((is_zero_b == 1'b0) && (sign_a == (~1'b0)) && (is_zero_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_8;
+wire is_both_zero_10 = ((is_zero_b == 1'b0) && (sign_a == (~1'b0)) && (is_zero_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_9;
+wire is_both_zero_11 = ((is_zero_b == 1'b0) && (sign_a == (~1'b0)) && (is_zero_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_10;
+wire is_both_zero_12 = ((is_zero_b == 1'b0) && (sign_a == 1'b0) && (is_zero_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_11;
+wire is_both_zero_13 = ((is_zero_b == 1'b0) && (sign_a == 1'b0) && (is_zero_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_12;
+wire is_both_zero_14 = ((is_zero_b == 1'b0) && (sign_a == 1'b0) && (is_zero_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : is_both_zero_13;
+wire is_both_zero = ((is_zero_b == 1'b0) && (sign_a == 1'b0) && (is_zero_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : is_both_zero_14;
+wire is_opposite = (sign_a != sign_b) && (exp_a == exp_b) && (mant_a == mant_b);
+wire is_one_zero_0 = ((is_zero_b == (~1'b0)) && (is_zero_a == (~1'b0)) && (is_both_zero == (~1'b0))) ? 1'h0 : ((is_zero_a || is_zero_b) && (!is_both_zero));
+wire is_one_zero_1 = ((is_zero_b == (~1'b0)) && (is_zero_a == (~1'b0)) && (is_both_zero == 1'b0)) ? 1'h1 : is_one_zero_0;
+wire is_one_zero_2 = ((is_zero_b == (~1'b0)) && (is_zero_a == 1'b0) && (is_both_zero == (~1'b0))) ? 1'h0 : is_one_zero_1;
+wire is_one_zero_3 = ((is_zero_b == (~1'b0)) && (is_zero_a == 1'b0) && (is_both_zero == 1'b0)) ? 1'h1 : is_one_zero_2;
+wire is_one_zero_4 = ((is_zero_b == 1'b0) && (is_zero_a == (~1'b0)) && (is_both_zero == (~1'b0))) ? 1'h0 : is_one_zero_3;
+wire is_one_zero_5 = ((is_zero_b == 1'b0) && (is_zero_a == (~1'b0)) && (is_both_zero == 1'b0)) ? 1'h1 : is_one_zero_4;
+wire is_one_zero_6 = ((is_zero_b == 1'b0) && (is_zero_a == 1'b0) && (is_both_zero == (~1'b0))) ? 1'h0 : is_one_zero_5;
+wire is_one_zero = ((is_zero_b == 1'b0) && (is_zero_a == 1'b0) && (is_both_zero == 1'b0)) ? 1'h0 : is_one_zero_6;
+
+wire result_sign_nan = 1'b0;
+wire [7:0]result_exp_nan = 8'hFF;
+wire [22:0]result_mant_nan = 23'b10000000000000000000000;
+
+wire result_sign_inf_0 = is_inf_a ? sign_a : sign_b;
+wire result_sign_inf_1 = ((is_inf_a == (~1'b0)) && (sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : result_sign_inf_0;
+wire result_sign_inf_2 = ((is_inf_a == (~1'b0)) && (sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h1 : result_sign_inf_1;
+wire result_sign_inf_3 = ((is_inf_a == (~1'b0)) && (sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : result_sign_inf_2;
+wire result_sign_inf_4 = ((is_inf_a == (~1'b0)) && (sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : result_sign_inf_3;
+wire result_sign_inf_5 = ((is_inf_a == 1'b0) && (sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : result_sign_inf_4;
+wire result_sign_inf_6 = ((is_inf_a == 1'b0) && (sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : result_sign_inf_5;
+wire result_sign_inf_7 = ((is_inf_a == 1'b0) && (sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h1 : result_sign_inf_6;
+wire result_sign_inf = ((is_inf_a == 1'b0) && (sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : result_sign_inf_7;
+wire [7:0]result_exp_inf = 8'hFF;
+wire [22:0]result_mant_inf = 23'b0;
+
+wire result_sign_both_zero_0 = (sign_a == (~1'b0)) ? 1'h1 : sign_a;
+wire result_sign_both_zero = (sign_a == 1'b0) ? 1'h0 : result_sign_both_zero_0;
+wire [7:0]result_exp_both_zero = 8'b0;
+wire [22:0]result_mant_both_zero = 23'b0;
+
+wire result_sign_opposite_0 = (io_rm == 3'b010) ? 1'b1 : 1'b0;
+wire result_sign_opposite_1 = (io_rm == (~3'b0)) ? 1'h0 : result_sign_opposite_0;
+wire result_sign_opposite = (io_rm == 3'b0) ? 1'h0 : result_sign_opposite_1;
+wire [7:0]result_exp_opposite = 8'b0;
+wire [22:0]result_mant_opposite = 23'b0;
+
+wire result_sign_one_zero_0 = is_zero_a ? sign_b : sign_a;
+wire result_sign_one_zero_1 = ((sign_a == (~1'b0)) && (is_zero_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : result_sign_one_zero_0;
+wire result_sign_one_zero_2 = ((sign_a == (~1'b0)) && (is_zero_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : result_sign_one_zero_1;
+wire result_sign_one_zero_3 = ((sign_a == (~1'b0)) && (is_zero_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h1 : result_sign_one_zero_2;
+wire result_sign_one_zero_4 = ((sign_a == (~1'b0)) && (is_zero_a == 1'b0) && (sign_b == 1'b0)) ? 1'h1 : result_sign_one_zero_3;
+wire result_sign_one_zero_5 = ((sign_a == 1'b0) && (is_zero_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : result_sign_one_zero_4;
+wire result_sign_one_zero_6 = ((sign_a == 1'b0) && (is_zero_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : result_sign_one_zero_5;
+wire result_sign_one_zero_7 = ((sign_a == 1'b0) && (is_zero_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : result_sign_one_zero_6;
+wire result_sign_one_zero = ((sign_a == 1'b0) && (is_zero_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : result_sign_one_zero_7;
+wire [7:0]result_exp_one_zero_0 = is_zero_a ? exp_b : exp_a;
+wire [7:0]result_exp_one_zero_1 = ((is_zero_a == (~1'b0)) && (exp_a == (~8'b0)) && (exp_b == (~8'b0))) ? 8'hff : result_exp_one_zero_0;
+wire [7:0]result_exp_one_zero_2 = ((is_zero_a == (~1'b0)) && (exp_a == (~8'b0)) && (exp_b == 8'b0)) ? 8'h0 : result_exp_one_zero_1;
+wire [7:0]result_exp_one_zero_3 = ((is_zero_a == (~1'b0)) && (exp_a == 8'b0) && (exp_b == (~8'b0))) ? 8'hff : result_exp_one_zero_2;
+wire [7:0]result_exp_one_zero_4 = ((is_zero_a == (~1'b0)) && (exp_a == 8'b0) && (exp_b == 8'b0)) ? 8'h0 : result_exp_one_zero_3;
+wire [7:0]result_exp_one_zero_5 = ((is_zero_a == 1'b0) && (exp_a == (~8'b0)) && (exp_b == (~8'b0))) ? 8'hff : result_exp_one_zero_4;
+wire [7:0]result_exp_one_zero_6 = ((is_zero_a == 1'b0) && (exp_a == (~8'b0)) && (exp_b == 8'b0)) ? 8'hff : result_exp_one_zero_5;
+wire [7:0]result_exp_one_zero_7 = ((is_zero_a == 1'b0) && (exp_a == 8'b0) && (exp_b == (~8'b0))) ? 8'h0 : result_exp_one_zero_6;
+wire [7:0]result_exp_one_zero = ((is_zero_a == 1'b0) && (exp_a == 8'b0) && (exp_b == 8'b0)) ? 8'h0 : result_exp_one_zero_7;
+wire [22:0]result_mant_one_zero_0 = is_zero_a ? mant_b : mant_a;
+wire [22:0]result_mant_one_zero_1 = ((mant_b == (~23'b0)) && (is_zero_a == (~1'b0)) && (mant_a == (~23'b0))) ? 23'h7fffff : result_mant_one_zero_0;
+wire [22:0]result_mant_one_zero_2 = ((mant_b == (~23'b0)) && (is_zero_a == (~1'b0)) && (mant_a == 23'b0)) ? 23'h7fffff : result_mant_one_zero_1;
+wire [22:0]result_mant_one_zero_3 = ((mant_b == (~23'b0)) && (is_zero_a == 1'b0) && (mant_a == (~23'b0))) ? 23'h7fffff : result_mant_one_zero_2;
+wire [22:0]result_mant_one_zero_4 = ((mant_b == (~23'b0)) && (is_zero_a == 1'b0) && (mant_a == 23'b0)) ? 23'h0 : result_mant_one_zero_3;
+wire [22:0]result_mant_one_zero_5 = ((mant_b == 23'b0) && (is_zero_a == (~1'b0)) && (mant_a == (~23'b0))) ? 23'h0 : result_mant_one_zero_4;
+wire [22:0]result_mant_one_zero_6 = ((mant_b == 23'b0) && (is_zero_a == (~1'b0)) && (mant_a == 23'b0)) ? 23'h0 : result_mant_one_zero_5;
+wire [22:0]result_mant_one_zero_7 = ((mant_b == 23'b0) && (is_zero_a == 1'b0) && (mant_a == (~23'b0))) ? 23'h7fffff : result_mant_one_zero_6;
+wire [22:0]result_mant_one_zero = ((mant_b == 23'b0) && (is_zero_a == 1'b0) && (mant_a == 23'b0)) ? 23'h0 : result_mant_one_zero_7;
+
+
+  // Sub-module 4: Prepare for Addition
+wire effective_subtraction_0 = ((sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h0 : (sign_a != sign_b);
+wire effective_subtraction_1 = ((sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h1 : effective_subtraction_0;
+wire effective_subtraction_2 = ((sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h1 : effective_subtraction_1;
+wire effective_subtraction = ((sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : effective_subtraction_2;
+wire [23:0]mant_ext_a_0 = is_subnormal_a ? {1'b0, mant_a} : {1'b1, mant_a};
+wire [23:0]mant_ext_a_1 = ((is_subnormal_a == (~1'b0)) && (mant_a == (~23'b0))) ? 24'h7fffff : mant_ext_a_0;
+wire [23:0]mant_ext_a_2 = ((is_subnormal_a == (~1'b0)) && (mant_a == 23'b0)) ? 24'h0 : mant_ext_a_1;
+wire [23:0]mant_ext_a_3 = ((is_subnormal_a == 1'b0) && (mant_a == (~23'b0))) ? 24'hffffff : mant_ext_a_2;
+wire [23:0]mant_ext_a = ((is_subnormal_a == 1'b0) && (mant_a == 23'b0)) ? 24'h800000 : mant_ext_a_3;
+wire [23:0]mant_ext_b_0 = is_subnormal_b ? {1'b0, mant_b} : {1'b1, mant_b};
+wire [23:0]mant_ext_b_1 = ((mant_b == (~23'b0)) && (is_subnormal_b == (~1'b0))) ? 24'h7fffff : mant_ext_b_0;
+wire [23:0]mant_ext_b_2 = ((mant_b == (~23'b0)) && (is_subnormal_b == 1'b0)) ? 24'hffffff : mant_ext_b_1;
+wire [23:0]mant_ext_b_3 = ((mant_b == 23'b0) && (is_subnormal_b == (~1'b0))) ? 24'h0 : mant_ext_b_2;
+wire [23:0]mant_ext_b = ((mant_b == 23'b0) && (is_subnormal_b == 1'b0)) ? 24'h800000 : mant_ext_b_3;
+wire [31:0]exp_ext_a_0 = is_subnormal_a ? (exp_a + 1) : exp_a;
+wire [31:0]exp_ext_a_1 = ((is_subnormal_a == (~1'b0)) && (exp_a == (~8'b0))) ? 32'h100 : exp_ext_a_0;
+wire [31:0]exp_ext_a_2 = ((is_subnormal_a == (~1'b0)) && (exp_a == 8'b0)) ? 32'h1 : exp_ext_a_1;
+wire [31:0]exp_ext_a_3 = ((is_subnormal_a == 1'b0) && (exp_a == (~8'b0))) ? 32'hff : exp_ext_a_2;
+wire [7:0]exp_ext_a = ((is_subnormal_a == 1'b0) && (exp_a == 8'b0)) ? 32'h0 : exp_ext_a_3;
+wire [31:0]exp_ext_b_0 = is_subnormal_b ? (exp_b + 1) : exp_b;
+wire [31:0]exp_ext_b_1 = ((is_subnormal_b == (~1'b0)) && (exp_b == (~8'b0))) ? 32'h100 : exp_ext_b_0;
+wire [31:0]exp_ext_b_2 = ((is_subnormal_b == (~1'b0)) && (exp_b == 8'b0)) ? 32'h1 : exp_ext_b_1;
+wire [31:0]exp_ext_b_3 = ((is_subnormal_b == 1'b0) && (exp_b == (~8'b0))) ? 32'hff : exp_ext_b_2;
+wire [7:0]exp_ext_b = ((is_subnormal_b == 1'b0) && (exp_b == 8'b0)) ? 32'h0 : exp_ext_b_3;
+wire [7:0]exp_diff_0 = (exp_ext_a > exp_ext_b) ? (exp_ext_a - exp_ext_b) : (exp_ext_b - exp_ext_a);
+wire [7:0]exp_diff_1 = ((exp_ext_b == (~8'b0)) && (exp_ext_a == (~8'b0))) ? 8'h0 : exp_diff_0;
+wire [7:0]exp_diff_2 = ((exp_ext_b == (~8'b0)) && (exp_ext_a == 8'b0)) ? 8'hff : exp_diff_1;
+wire [7:0]exp_diff_3 = ((exp_ext_b == 8'b0) && (exp_ext_a == (~8'b0))) ? 8'hff : exp_diff_2;
+wire [7:0]exp_diff = ((exp_ext_b == 8'b0) && (exp_ext_a == 8'b0)) ? 8'h0 : exp_diff_3;
+wire [7:0]aligned_exp_0 = (exp_ext_a > exp_ext_b) ? exp_ext_a : exp_ext_b;
+wire [7:0]aligned_exp_1 = ((exp_ext_b == (~8'b0)) && (exp_ext_a == (~8'b0))) ? 8'hff : aligned_exp_0;
+wire [7:0]aligned_exp_2 = ((exp_ext_b == (~8'b0)) && (exp_ext_a == 8'b0)) ? 8'hff : aligned_exp_1;
+wire [7:0]aligned_exp_3 = ((exp_ext_b == 8'b0) && (exp_ext_a == (~8'b0))) ? 8'hff : aligned_exp_2;
+wire [7:0]aligned_exp = ((exp_ext_b == 8'b0) && (exp_ext_a == 8'b0)) ? 8'h0 : aligned_exp_3;
+
+  // Sub-module 5: Mantissa Alignment
+
+
+wire need_swap_0 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == (~8'b0)) && (exp_ext_a == (~8'b0)) && (mant_ext_a == (~24'b0))) ? 1'h0 : ((exp_ext_a < exp_ext_b) || ((exp_ext_a == exp_ext_b) && (mant_ext_a < mant_ext_b)));
+wire need_swap_1 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == (~8'b0)) && (exp_ext_a == (~8'b0)) && (mant_ext_a == 24'b0)) ? 1'h1 : need_swap_0;
+wire need_swap_2 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == (~8'b0)) && (exp_ext_a == 8'b0) && (mant_ext_a == (~24'b0))) ? 1'h1 : need_swap_1;
+wire need_swap_3 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == (~8'b0)) && (exp_ext_a == 8'b0) && (mant_ext_a == 24'b0)) ? 1'h1 : need_swap_2;
+wire need_swap_4 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == 8'b0) && (exp_ext_a == (~8'b0)) && (mant_ext_a == (~24'b0))) ? 1'h0 : need_swap_3;
+wire need_swap_5 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == 8'b0) && (exp_ext_a == (~8'b0)) && (mant_ext_a == 24'b0)) ? 1'h0 : need_swap_4;
+wire need_swap_6 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == 8'b0) && (exp_ext_a == 8'b0) && (mant_ext_a == (~24'b0))) ? 1'h0 : need_swap_5;
+wire need_swap_7 = ((mant_ext_b == (~24'b0)) && (exp_ext_b == 8'b0) && (exp_ext_a == 8'b0) && (mant_ext_a == 24'b0)) ? 1'h1 : need_swap_6;
+wire need_swap_8 = ((mant_ext_b == 24'b0) && (exp_ext_b == (~8'b0)) && (exp_ext_a == (~8'b0)) && (mant_ext_a == (~24'b0))) ? 1'h0 : need_swap_7;
+wire need_swap_9 = ((mant_ext_b == 24'b0) && (exp_ext_b == (~8'b0)) && (exp_ext_a == (~8'b0)) && (mant_ext_a == 24'b0)) ? 1'h0 : need_swap_8;
+wire need_swap_10 = ((mant_ext_b == 24'b0) && (exp_ext_b == (~8'b0)) && (exp_ext_a == 8'b0) && (mant_ext_a == (~24'b0))) ? 1'h1 : need_swap_9;
+wire need_swap_11 = ((mant_ext_b == 24'b0) && (exp_ext_b == (~8'b0)) && (exp_ext_a == 8'b0) && (mant_ext_a == 24'b0)) ? 1'h1 : need_swap_10;
+wire need_swap_12 = ((mant_ext_b == 24'b0) && (exp_ext_b == 8'b0) && (exp_ext_a == (~8'b0)) && (mant_ext_a == (~24'b0))) ? 1'h0 : need_swap_11;
+wire need_swap_13 = ((mant_ext_b == 24'b0) && (exp_ext_b == 8'b0) && (exp_ext_a == (~8'b0)) && (mant_ext_a == 24'b0)) ? 1'h0 : need_swap_12;
+wire need_swap_14 = ((mant_ext_b == 24'b0) && (exp_ext_b == 8'b0) && (exp_ext_a == 8'b0) && (mant_ext_a == (~24'b0))) ? 1'h0 : need_swap_13;
+wire need_swap = ((mant_ext_b == 24'b0) && (exp_ext_b == 8'b0) && (exp_ext_a == 8'b0) && (mant_ext_a == 24'b0)) ? 1'h0 : need_swap_14;
+  
+wire [25:0]shift_smaller_0 = need_swap ? {mant_ext_a, 2'b00} : {mant_ext_b, 2'b00};
+wire [25:0]shift_smaller_1 = ((need_swap == (~1'b0)) && (mant_ext_b == (~24'b0)) && (mant_ext_a == (~24'b0))) ? 26'h3fffffc : shift_smaller_0;
+wire [25:0]shift_smaller_2 = ((need_swap == (~1'b0)) && (mant_ext_b == (~24'b0)) && (mant_ext_a == 24'b0)) ? 26'h0 : shift_smaller_1;
+wire [25:0]shift_smaller_3 = ((need_swap == (~1'b0)) && (mant_ext_b == 24'b0) && (mant_ext_a == (~24'b0))) ? 26'h3fffffc : shift_smaller_2;
+wire [25:0]shift_smaller_4 = ((need_swap == (~1'b0)) && (mant_ext_b == 24'b0) && (mant_ext_a == 24'b0)) ? 26'h0 : shift_smaller_3;
+wire [25:0]shift_smaller_5 = ((need_swap == 1'b0) && (mant_ext_b == (~24'b0)) && (mant_ext_a == (~24'b0))) ? 26'h3fffffc : shift_smaller_4;
+wire [25:0]shift_smaller_6 = ((need_swap == 1'b0) && (mant_ext_b == (~24'b0)) && (mant_ext_a == 24'b0)) ? 26'h3fffffc : shift_smaller_5;
+wire [25:0]shift_smaller_7 = ((need_swap == 1'b0) && (mant_ext_b == 24'b0) && (mant_ext_a == (~24'b0))) ? 26'h0 : shift_smaller_6;
+wire [25:0]shift_smaller = ((need_swap == 1'b0) && (mant_ext_b == 24'b0) && (mant_ext_a == 24'b0)) ? 26'h0 : shift_smaller_7;
+wire shift_too_large_0 = (exp_diff == (~8'b0)) ? 1'h1 : (exp_diff >= 26);
+wire shift_too_large = (exp_diff == 8'b0) ? 1'h0 : shift_too_large_0;
+wire [31:0]main_0 = shift_too_large ? 0 : (shift_smaller >> exp_diff);
+wire [31:0]main_1 = ((shift_too_large == (~1'b0)) && (exp_diff == (~8'b0)) && (shift_smaller == (~26'b0))) ? 32'h0 : main_0;
+wire [31:0]main_2 = ((shift_too_large == (~1'b0)) && (exp_diff == (~8'b0)) && (shift_smaller == 26'b0)) ? 32'h0 : main_1;
+wire [31:0]main_3 = ((shift_too_large == (~1'b0)) && (exp_diff == 8'b0) && (shift_smaller == (~26'b0))) ? 32'h0 : main_2;
+wire [31:0]main_4 = ((shift_too_large == (~1'b0)) && (exp_diff == 8'b0) && (shift_smaller == 26'b0)) ? 32'h0 : main_3;
+wire [31:0]main_5 = ((shift_too_large == 1'b0) && (exp_diff == (~8'b0)) && (shift_smaller == (~26'b0))) ? 32'h0 : main_4;
+wire [31:0]main_6 = ((shift_too_large == 1'b0) && (exp_diff == (~8'b0)) && (shift_smaller == 26'b0)) ? 32'h0 : main_5;
+wire [31:0]main_7 = ((shift_too_large == 1'b0) && (exp_diff == 8'b0) && (shift_smaller == (~26'b0))) ? 32'h3ffffff : main_6;
+wire [25:0]main = ((shift_too_large == 1'b0) && (exp_diff == 8'b0) && (shift_smaller == 26'b0)) ? 32'h0 : main_7;
+wire smaller_sticky_0 = shift_too_large ? (|shift_smaller) : (|(shift_smaller & ((1 << exp_diff) - 1)));
+wire smaller_sticky_1 = ((shift_too_large == (~1'b0)) && (exp_diff == (~8'b0)) && (shift_smaller == (~26'b0))) ? 1'h1 : smaller_sticky_0;
+wire smaller_sticky_2 = ((shift_too_large == (~1'b0)) && (exp_diff == (~8'b0)) && (shift_smaller == 26'b0)) ? 1'h0 : smaller_sticky_1;
+wire smaller_sticky_3 = ((shift_too_large == (~1'b0)) && (exp_diff == 8'b0) && (shift_smaller == (~26'b0))) ? 1'h1 : smaller_sticky_2;
+wire smaller_sticky_4 = ((shift_too_large == (~1'b0)) && (exp_diff == 8'b0) && (shift_smaller == 26'b0)) ? 1'h0 : smaller_sticky_3;
+wire smaller_sticky_5 = ((shift_too_large == 1'b0) && (exp_diff == (~8'b0)) && (shift_smaller == (~26'b0))) ? 1'h1 : smaller_sticky_4;
+wire smaller_sticky_6 = ((shift_too_large == 1'b0) && (exp_diff == (~8'b0)) && (shift_smaller == 26'b0)) ? 1'h0 : smaller_sticky_5;
+wire smaller_sticky_7 = ((shift_too_large == 1'b0) && (exp_diff == 8'b0) && (shift_smaller == (~26'b0))) ? 1'h0 : smaller_sticky_6;
+wire smaller_sticky = ((shift_too_large == 1'b0) && (exp_diff == 8'b0) && (shift_smaller == 26'b0)) ? 1'h0 : smaller_sticky_7;
+
+wire [27:0]aligned_mant_smaller_0 = ((main == (~26'b0)) && (smaller_sticky == (~1'b0))) ? 28'h7ffffff : {1'b0, main, smaller_sticky};
+wire [27:0]aligned_mant_smaller_1 = ((main == (~26'b0)) && (smaller_sticky == 1'b0)) ? 28'h7fffffe : aligned_mant_smaller_0;
+wire [27:0]aligned_mant_smaller_2 = ((main == 26'b0) && (smaller_sticky == (~1'b0))) ? 28'h1 : aligned_mant_smaller_1;
+wire [27:0]aligned_mant_smaller = ((main == 26'b0) && (smaller_sticky == 1'b0)) ? 28'h0 : aligned_mant_smaller_2;
+wire [27:0]aligned_mant_larger_0 = need_swap ? {1'b0, mant_ext_b, 3'b000} : {1'b0, mant_ext_a, 3'b000};
+wire [27:0]aligned_mant_larger_1 = ((need_swap == (~1'b0)) && (mant_ext_b == (~24'b0)) && (mant_ext_a == (~24'b0))) ? 28'h7fffff8 : aligned_mant_larger_0;
+wire [27:0]aligned_mant_larger_2 = ((need_swap == (~1'b0)) && (mant_ext_b == (~24'b0)) && (mant_ext_a == 24'b0)) ? 28'h7fffff8 : aligned_mant_larger_1;
+wire [27:0]aligned_mant_larger_3 = ((need_swap == (~1'b0)) && (mant_ext_b == 24'b0) && (mant_ext_a == (~24'b0))) ? 28'h0 : aligned_mant_larger_2;
+wire [27:0]aligned_mant_larger_4 = ((need_swap == (~1'b0)) && (mant_ext_b == 24'b0) && (mant_ext_a == 24'b0)) ? 28'h0 : aligned_mant_larger_3;
+wire [27:0]aligned_mant_larger_5 = ((need_swap == 1'b0) && (mant_ext_b == (~24'b0)) && (mant_ext_a == (~24'b0))) ? 28'h7fffff8 : aligned_mant_larger_4;
+wire [27:0]aligned_mant_larger_6 = ((need_swap == 1'b0) && (mant_ext_b == (~24'b0)) && (mant_ext_a == 24'b0)) ? 28'h0 : aligned_mant_larger_5;
+wire [27:0]aligned_mant_larger_7 = ((need_swap == 1'b0) && (mant_ext_b == 24'b0) && (mant_ext_a == (~24'b0))) ? 28'h7fffff8 : aligned_mant_larger_6;
+wire [27:0]aligned_mant_larger = ((need_swap == 1'b0) && (mant_ext_b == 24'b0) && (mant_ext_a == 24'b0)) ? 28'h0 : aligned_mant_larger_7;
+
+wire resultant_sign_0 = need_swap ? sign_b : sign_a;
+wire resultant_sign_1 = (!effective_subtraction) ? sign_a : resultant_sign_0;
+wire resultant_sign_2 = ((effective_subtraction == (~1'b0)) && (need_swap == (~1'b0)) && (sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : resultant_sign_1;
+wire resultant_sign_3 = ((effective_subtraction == (~1'b0)) && (need_swap == (~1'b0)) && (sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h0 : resultant_sign_2;
+wire resultant_sign_4 = ((effective_subtraction == (~1'b0)) && (need_swap == (~1'b0)) && (sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h1 : resultant_sign_3;
+wire resultant_sign_5 = ((effective_subtraction == (~1'b0)) && (need_swap == (~1'b0)) && (sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : resultant_sign_4;
+wire resultant_sign_6 = ((effective_subtraction == (~1'b0)) && (need_swap == 1'b0) && (sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : resultant_sign_5;
+wire resultant_sign_7 = ((effective_subtraction == (~1'b0)) && (need_swap == 1'b0) && (sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h1 : resultant_sign_6;
+wire resultant_sign_8 = ((effective_subtraction == (~1'b0)) && (need_swap == 1'b0) && (sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : resultant_sign_7;
+wire resultant_sign_9 = ((effective_subtraction == (~1'b0)) && (need_swap == 1'b0) && (sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : resultant_sign_8;
+wire resultant_sign_10 = ((effective_subtraction == 1'b0) && (need_swap == (~1'b0)) && (sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : resultant_sign_9;
+wire resultant_sign_11 = ((effective_subtraction == 1'b0) && (need_swap == (~1'b0)) && (sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h1 : resultant_sign_10;
+wire resultant_sign_12 = ((effective_subtraction == 1'b0) && (need_swap == (~1'b0)) && (sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : resultant_sign_11;
+wire resultant_sign_13 = ((effective_subtraction == 1'b0) && (need_swap == (~1'b0)) && (sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : resultant_sign_12;
+wire resultant_sign_14 = ((effective_subtraction == 1'b0) && (need_swap == 1'b0) && (sign_a == (~1'b0)) && (sign_b == (~1'b0))) ? 1'h1 : resultant_sign_13;
+wire resultant_sign_15 = ((effective_subtraction == 1'b0) && (need_swap == 1'b0) && (sign_a == (~1'b0)) && (sign_b == 1'b0)) ? 1'h1 : resultant_sign_14;
+wire resultant_sign_16 = ((effective_subtraction == 1'b0) && (need_swap == 1'b0) && (sign_a == 1'b0) && (sign_b == (~1'b0))) ? 1'h0 : resultant_sign_15;
+wire resultant_sign = ((effective_subtraction == 1'b0) && (need_swap == 1'b0) && (sign_a == 1'b0) && (sign_b == 1'b0)) ? 1'h0 : resultant_sign_16;
+
+wire [27:0]adder_result_0 = (!effective_subtraction) ? (aligned_mant_larger + aligned_mant_smaller) : (aligned_mant_larger - aligned_mant_smaller);
+wire [27:0]adder_result_1 = ((aligned_mant_larger == (~28'b0)) && (effective_subtraction == (~1'b0)) && (aligned_mant_smaller == (~28'b0))) ? 28'h0 : adder_result_0;
+wire [27:0]adder_result_2 = ((aligned_mant_larger == (~28'b0)) && (effective_subtraction == (~1'b0)) && (aligned_mant_smaller == 28'b0)) ? 28'hfffffff : adder_result_1;
+wire [27:0]adder_result_3 = ((aligned_mant_larger == (~28'b0)) && (effective_subtraction == 1'b0) && (aligned_mant_smaller == (~28'b0))) ? 28'hffffffe : adder_result_2;
+wire [27:0]adder_result_4 = ((aligned_mant_larger == (~28'b0)) && (effective_subtraction == 1'b0) && (aligned_mant_smaller == 28'b0)) ? 28'hfffffff : adder_result_3;
+wire [27:0]adder_result_5 = ((aligned_mant_larger == 28'b0) && (effective_subtraction == (~1'b0)) && (aligned_mant_smaller == (~28'b0))) ? 28'hfffffff : adder_result_4;
+wire [27:0]adder_result_6 = ((aligned_mant_larger == 28'b0) && (effective_subtraction == (~1'b0)) && (aligned_mant_smaller == 28'b0)) ? 28'h0 : adder_result_5;
+wire [27:0]adder_result_7 = ((aligned_mant_larger == 28'b0) && (effective_subtraction == 1'b0) && (aligned_mant_smaller == (~28'b0))) ? 28'hfffffff : adder_result_6;
+wire [27:0]adder_result = ((aligned_mant_larger == 28'b0) && (effective_subtraction == 1'b0) && (aligned_mant_smaller == 28'b0)) ? 28'h0 : adder_result_7;
+
+
+  // Sub-module 6: Result Normalization and Left shifting
+wire carry_out_0 = (adder_result[27] == (~1'b0)) ? 1'h1 : adder_result[27];
+wire carry_out = (adder_result[27] == 1'b0) ? 1'h0 : carry_out_0;
+wire implied_bit_0 = (adder_result[26] == (~1'b0)) ? 1'h1 : adder_result[26];
+wire implied_bit = (adder_result[26] == 1'b0) ? 1'h0 : implied_bit_0;
+wire cancellation_0 = ((implied_bit == (~1'b0)) && (carry_out == (~1'b0))) ? 1'h0 : ((!carry_out) && (!implied_bit));
+wire cancellation_1 = ((implied_bit == (~1'b0)) && (carry_out == 1'b0)) ? 1'h0 : cancellation_0;
+wire cancellation_2 = ((implied_bit == 1'b0) && (carry_out == (~1'b0))) ? 1'h0 : cancellation_1;
+wire cancellation = ((implied_bit == 1'b0) && (carry_out == 1'b0)) ? 1'h1 : cancellation_2;
+wire keep_0 = ((implied_bit == (~1'b0)) && (carry_out == (~1'b0))) ? 1'h0 : ((!carry_out) && implied_bit);
+wire keep_1 = ((implied_bit == (~1'b0)) && (carry_out == 1'b0)) ? 1'h1 : keep_0;
+wire keep_2 = ((implied_bit == 1'b0) && (carry_out == (~1'b0))) ? 1'h0 : keep_1;
+wire keep = ((implied_bit == 1'b0) && (carry_out == 1'b0)) ? 1'h0 : keep_2;
+  // wire small_add = is_subnormal_a && is_subnormal_b;
+wire small_add_0 = ((exp_a == (~8'b0)) && (exp_b == (~8'b0))) ? 1'h0 : ((exp_a == 8'h00) && (exp_b == 8'h00));
+wire small_add_1 = ((exp_a == (~8'b0)) && (exp_b == 8'b0)) ? 1'h0 : small_add_0;
+wire small_add_2 = ((exp_a == 8'b0) && (exp_b == (~8'b0))) ? 1'h0 : small_add_1;
+wire small_add = ((exp_a == 8'b0) && (exp_b == 8'b0)) ? 1'h1 : small_add_2;
+wire [4:0]computed_shift_0 = adder_result[3] ? 5'd23 : 5'd24;
+wire [4:0]computed_shift_1 = adder_result[4] ? 5'd22 : computed_shift_0;
+wire [4:0]computed_shift_2 = adder_result[5] ? 5'd21 : computed_shift_1;
+wire [4:0]computed_shift_3 = adder_result[6] ? 5'd20 : computed_shift_2;
+wire [4:0]computed_shift_4 = adder_result[7] ? 5'd19 : computed_shift_3;
+wire [4:0]computed_shift_5 = adder_result[8] ? 5'd18 : computed_shift_4;
+wire [4:0]computed_shift_6 = adder_result[9] ? 5'd17 : computed_shift_5;
+wire [4:0]computed_shift_7 = adder_result[10] ? 5'd16 : computed_shift_6;
+wire [4:0]computed_shift_8 = adder_result[11] ? 5'd15 : computed_shift_7;
+wire [4:0]computed_shift_9 = adder_result[12] ? 5'd14 : computed_shift_8;
+wire [4:0]computed_shift_10 = adder_result[13] ? 5'd13 : computed_shift_9;
+wire [4:0]computed_shift_11 = adder_result[14] ? 5'd12 : computed_shift_10;
+wire [4:0]computed_shift_12 = adder_result[15] ? 5'd11 : computed_shift_11;
+wire [4:0]computed_shift_13 = adder_result[16] ? 5'd10 : computed_shift_12;
+wire [4:0]computed_shift_14 = adder_result[17] ? 5'd9 : computed_shift_13;
+wire [4:0]computed_shift_15 = adder_result[18] ? 5'd8 : computed_shift_14;
+wire [4:0]computed_shift_16 = adder_result[19] ? 5'd7 : computed_shift_15;
+wire [4:0]computed_shift_17 = adder_result[20] ? 5'd6 : computed_shift_16;
+wire [4:0]computed_shift_18 = adder_result[21] ? 5'd5 : computed_shift_17;
+wire [4:0]computed_shift_19 = adder_result[22] ? 5'd4 : computed_shift_18;
+wire [4:0]computed_shift_20 = adder_result[23] ? 5'd3 : computed_shift_19;
+wire [4:0]computed_shift_21 = adder_result[24] ? 5'd2 : computed_shift_20;
+wire [4:0]computed_shift = adder_result[25] ? 5'd1 : computed_shift_21;
+wire [31:0]real_shift_norm_0 = (aligned_exp > computed_shift) ? computed_shift : (aligned_exp - 1);
+wire [31:0]real_shift_norm_1 = ((computed_shift == (~5'b0)) && (aligned_exp == (~8'b0))) ? 32'h1f : real_shift_norm_0;
+wire [31:0]real_shift_norm_2 = ((computed_shift == (~5'b0)) && (aligned_exp == 8'b0)) ? 32'h1 : real_shift_norm_1;
+wire [31:0]real_shift_norm_3 = ((computed_shift == 5'b0) && (aligned_exp == (~8'b0))) ? 32'h0 : real_shift_norm_2;
+wire [4:0]real_shift_norm = ((computed_shift == 5'b0) && (aligned_exp == 8'b0)) ? 32'h1 : real_shift_norm_3;
+wire [7:0]adjusted_exp_0 = (aligned_exp > computed_shift) ? (aligned_exp - computed_shift) : 8'b0;
+wire [7:0]adjusted_exp_1 = ((computed_shift == (~5'b0)) && (aligned_exp == (~8'b0))) ? 8'he0 : adjusted_exp_0;
+wire [7:0]adjusted_exp_2 = ((computed_shift == (~5'b0)) && (aligned_exp == 8'b0)) ? 8'h0 : adjusted_exp_1;
+wire [7:0]adjusted_exp_3 = ((computed_shift == 5'b0) && (aligned_exp == (~8'b0))) ? 8'hff : adjusted_exp_2;
+wire [7:0]adjusted_exp = ((computed_shift == 5'b0) && (aligned_exp == 8'b0)) ? 8'h0 : adjusted_exp_3;
+  
+wire [26:0]normalized_mantissa_0 = (cancellation && (!small_add)) ? {(adder_result[25:0] << real_shift_norm)} : adder_result[26:0];
+wire [26:0]normalized_mantissa_1 = (keep || small_add) ? {adder_result[26:1], adder_result[0]} : normalized_mantissa_0;
+wire [26:0]normalized_mantissa = carry_out ? {adder_result[27:2], (|adder_result[1:0])} : normalized_mantissa_1;
+wire [7:0]normalized_exp_0 = cancellation ? adjusted_exp : aligned_exp;
+wire [7:0]normalized_exp_1 = keep ? aligned_exp : normalized_exp_0;
+wire [7:0]normalized_exp = carry_out ? (aligned_exp + 1) : normalized_exp_1;
+
+  // Sub-module 7: Rounding processing
+wire [22:0]rounding_input_0 = (normalized_mantissa[25:3] == (~23'b0)) ? 23'h7fffff : normalized_mantissa[25:3];
+wire [22:0]rounding_input = (normalized_mantissa[25:3] == 23'b0) ? 23'h0 : rounding_input_0;
+wire f1_0 = (normalized_mantissa[3] == (~1'b0)) ? 1'h1 : normalized_mantissa[3];
+wire f1 = (normalized_mantissa[3] == 1'b0) ? 1'h0 : f1_0;
+wire f2_0 = (normalized_mantissa[2] == (~1'b0)) ? 1'h1 : normalized_mantissa[2];
+wire f2 = (normalized_mantissa[2] == 1'b0) ? 1'h0 : f2_0;
+wire f3_0 = (normalized_mantissa[1:0] == (~2'b0)) ? 1'h1 : (|normalized_mantissa[1:0]);
+wire f3 = (normalized_mantissa[1:0] == 2'b0) ? 1'h0 : f3_0;
+wire inexact_flag_0 = ((f2 == (~1'b0)) && (f3 == (~1'b0))) ? 1'h1 : (f2 | f3);
+wire inexact_flag_1 = ((f2 == (~1'b0)) && (f3 == 1'b0)) ? 1'h1 : inexact_flag_0;
+wire inexact_flag_2 = ((f2 == 1'b0) && (f3 == (~1'b0))) ? 1'h1 : inexact_flag_1;
+wire inexact_flag = ((f2 == 1'b0) && (f3 == 1'b0)) ? 1'h0 : inexact_flag_2;
+wire round_up_0 = (io_rm == 3'b100) ? f2 : 1'b0;
+wire round_up_1 = (io_rm == 3'b011) ? (inexact_flag && (!resultant_sign)) : round_up_0;
+wire round_up_2 = (io_rm == 3'b010) ? (inexact_flag && resultant_sign) : round_up_1;
+wire round_up_3 = (io_rm == 3'b001) ? 1'b0 : round_up_2;
+wire round_up = (io_rm == 3'b000) ? (f2 && (f1 || f3)) : round_up_3;
+wire [7:0]rounded_exp_0 = (normalized_exp == (~8'b0)) ? 8'hff : normalized_exp;
+wire [7:0]rounded_exp = (normalized_exp == 8'b0) ? 8'h0 : rounded_exp_0;
+wire [31:0]rounded_mantissa_0 = round_up ? (rounding_input + 1) : rounding_input;
+wire [31:0]rounded_mantissa_1 = ((round_up == (~1'b0)) && (rounding_input == (~23'b0))) ? 32'h800000 : rounded_mantissa_0;
+wire [31:0]rounded_mantissa_2 = ((round_up == (~1'b0)) && (rounding_input == 23'b0)) ? 32'h1 : rounded_mantissa_1;
+wire [31:0]rounded_mantissa_3 = ((round_up == 1'b0) && (rounding_input == (~23'b0))) ? 32'h7fffff : rounded_mantissa_2;
+wire [22:0]rounded_mantissa = ((round_up == 1'b0) && (rounding_input == 23'b0)) ? 32'h0 : rounded_mantissa_3;
+
+  // Sub-module 8: Exception Flags
+wire tiny_0 = ((keep == (~1'b0)) && (small_add == (~1'b0)) && (cancellation == (~1'b0))) ? 1'h1 : (small_add && (cancellation || keep));
+wire tiny_1 = ((keep == (~1'b0)) && (small_add == (~1'b0)) && (cancellation == 1'b0)) ? 1'h1 : tiny_0;
+wire tiny_2 = ((keep == (~1'b0)) && (small_add == 1'b0) && (cancellation == (~1'b0))) ? 1'h0 : tiny_1;
+wire tiny_3 = ((keep == (~1'b0)) && (small_add == 1'b0) && (cancellation == 1'b0)) ? 1'h0 : tiny_2;
+wire tiny_4 = ((keep == 1'b0) && (small_add == (~1'b0)) && (cancellation == (~1'b0))) ? 1'h1 : tiny_3;
+wire tiny_5 = ((keep == 1'b0) && (small_add == (~1'b0)) && (cancellation == 1'b0)) ? 1'h0 : tiny_4;
+wire tiny_6 = ((keep == 1'b0) && (small_add == 1'b0) && (cancellation == (~1'b0))) ? 1'h0 : tiny_5;
+wire tiny = ((keep == 1'b0) && (small_add == 1'b0) && (cancellation == 1'b0)) ? 1'h0 : tiny_6;
+wire overflow_0 = ((carry_out == (~1'b0)) && (aligned_exp == (~8'b0)) && (rounded_exp == (~8'b0))) ? 1'h1 : ((rounded_exp == 8'hFF) || ((aligned_exp == 8'hFE) && carry_out));
+wire overflow_1 = ((carry_out == (~1'b0)) && (aligned_exp == (~8'b0)) && (rounded_exp == 8'b0)) ? 1'h0 : overflow_0;
+wire overflow_2 = ((carry_out == (~1'b0)) && (aligned_exp == 8'b0) && (rounded_exp == (~8'b0))) ? 1'h1 : overflow_1;
+wire overflow_3 = ((carry_out == (~1'b0)) && (aligned_exp == 8'b0) && (rounded_exp == 8'b0)) ? 1'h0 : overflow_2;
+wire overflow_4 = ((carry_out == 1'b0) && (aligned_exp == (~8'b0)) && (rounded_exp == (~8'b0))) ? 1'h1 : overflow_3;
+wire overflow_5 = ((carry_out == 1'b0) && (aligned_exp == (~8'b0)) && (rounded_exp == 8'b0)) ? 1'h0 : overflow_4;
+wire overflow_6 = ((carry_out == 1'b0) && (aligned_exp == 8'b0) && (rounded_exp == (~8'b0))) ? 1'h1 : overflow_5;
+wire overflow = ((carry_out == 1'b0) && (aligned_exp == 8'b0) && (rounded_exp == 8'b0)) ? 1'h0 : overflow_6;
+wire inexact_0 = ((overflow == (~1'b0)) && (inexact_flag == (~1'b0))) ? 1'h1 : (inexact_flag || overflow);
+wire inexact_1 = ((overflow == (~1'b0)) && (inexact_flag == 1'b0)) ? 1'h1 : inexact_0;
+wire inexact_2 = ((overflow == 1'b0) && (inexact_flag == (~1'b0))) ? 1'h1 : inexact_1;
+wire inexact = ((overflow == 1'b0) && (inexact_flag == 1'b0)) ? 1'h0 : inexact_2;
+wire underflow_0 = ((overflow == (~1'b0)) && (tiny == (~1'b0)) && (inexact == (~1'b0))) ? 1'h0 : (tiny && inexact && (!overflow));
+wire underflow_1 = ((overflow == (~1'b0)) && (tiny == (~1'b0)) && (inexact == 1'b0)) ? 1'h0 : underflow_0;
+wire underflow_2 = ((overflow == (~1'b0)) && (tiny == 1'b0) && (inexact == (~1'b0))) ? 1'h0 : underflow_1;
+wire underflow_3 = ((overflow == (~1'b0)) && (tiny == 1'b0) && (inexact == 1'b0)) ? 1'h0 : underflow_2;
+wire underflow_4 = ((overflow == 1'b0) && (tiny == (~1'b0)) && (inexact == (~1'b0))) ? 1'h1 : underflow_3;
+wire underflow_5 = ((overflow == 1'b0) && (tiny == (~1'b0)) && (inexact == 1'b0)) ? 1'h0 : underflow_4;
+wire underflow_6 = ((overflow == 1'b0) && (tiny == 1'b0) && (inexact == (~1'b0))) ? 1'h0 : underflow_5;
+wire underflow = ((overflow == 1'b0) && (tiny == 1'b0) && (inexact == 1'b0)) ? 1'h0 : underflow_6;
+wire special_flag = is_Snan_a || is_Snan_b || (is_inf_a && is_inf_b && (sign_a != sign_b));
+
+  // Sub-module 9: Result Construction
+wire rmin_0 = ((resultant_sign == (~1'b0)) && (io_rm == (~3'b0))) ? 1'h0 : ((io_rm == 3'b001) || ((io_rm == 3'b010) && (!resultant_sign)) || ((io_rm == 3'b011) && resultant_sign));
+wire rmin_1 = ((resultant_sign == (~1'b0)) && (io_rm == 3'b0)) ? 1'h0 : rmin_0;
+wire rmin_2 = ((resultant_sign == 1'b0) && (io_rm == (~3'b0))) ? 1'h0 : rmin_1;
+wire rmin = ((resultant_sign == 1'b0) && (io_rm == 3'b0)) ? 1'h0 : rmin_2;
+wire [7:0]overflow_result_0 = rmin ? 8'hFE : 8'hFF;
+wire [22:0]overflow_result_1 = rmin ? 23'h7FFFFF : 23'b0;
+wire [31:0]overflow_result_2 = ((resultant_sign == (~1'b0)) && (rmin == (~1'b0))) ? 32'hff7fffff : {resultant_sign, overflow_result_0, overflow_result_1};
+wire [31:0]overflow_result_3 = ((resultant_sign == (~1'b0)) && (rmin == 1'b0)) ? 32'hff800000 : overflow_result_2;
+wire [31:0]overflow_result_4 = ((resultant_sign == 1'b0) && (rmin == (~1'b0))) ? 32'h7f7fffff : overflow_result_3;
+wire [31:0]overflow_result = ((resultant_sign == 1'b0) && (rmin == 1'b0)) ? 32'h7f800000 : overflow_result_4;
+wire [31:0]normal_result_0 = ((resultant_sign == (~1'b0)) && (rounded_exp == (~8'b0)) && (rounded_mantissa == (~23'b0))) ? 32'hffffffff : {resultant_sign, rounded_exp, rounded_mantissa};
+wire [31:0]normal_result_1 = ((resultant_sign == (~1'b0)) && (rounded_exp == (~8'b0)) && (rounded_mantissa == 23'b0)) ? 32'hff800000 : normal_result_0;
+wire [31:0]normal_result_2 = ((resultant_sign == (~1'b0)) && (rounded_exp == 8'b0) && (rounded_mantissa == (~23'b0))) ? 32'h807fffff : normal_result_1;
+wire [31:0]normal_result_3 = ((resultant_sign == (~1'b0)) && (rounded_exp == 8'b0) && (rounded_mantissa == 23'b0)) ? 32'h80000000 : normal_result_2;
+wire [31:0]normal_result_4 = ((resultant_sign == 1'b0) && (rounded_exp == (~8'b0)) && (rounded_mantissa == (~23'b0))) ? 32'h7fffffff : normal_result_3;
+wire [31:0]normal_result_5 = ((resultant_sign == 1'b0) && (rounded_exp == (~8'b0)) && (rounded_mantissa == 23'b0)) ? 32'h7f800000 : normal_result_4;
+wire [31:0]normal_result_6 = ((resultant_sign == 1'b0) && (rounded_exp == 8'b0) && (rounded_mantissa == (~23'b0))) ? 32'h7fffff : normal_result_5;
+wire [31:0]normal_result = ((resultant_sign == 1'b0) && (rounded_exp == 8'b0) && (rounded_mantissa == 23'b0)) ? 32'h0 : normal_result_6;
+wire [31:0]special_result_0 = is_one_zero ? {result_sign_one_zero, result_exp_one_zero, result_mant_one_zero} : {1'b0, 8'hFF, 23'b10000000000000000000000};
+wire [31:0]special_result_1 = is_opposite ? {result_sign_opposite, result_exp_opposite, result_mant_opposite} : special_result_0;
+wire [31:0]special_result_2 = is_both_zero ? {result_sign_both_zero, result_exp_both_zero, result_mant_both_zero} : special_result_1;
+wire [31:0]special_result_3 = is_inf ? {result_sign_inf, result_exp_inf, result_mant_inf} : special_result_2;
+wire [31:0]special_result = is_nan ? {result_sign_nan, result_exp_nan, result_mant_nan} : special_result_3;
+wire special_case_happen = is_nan || is_inf || is_both_zero || is_opposite || is_one_zero;
+  
+wire [4:0]io_fflags_0 = (is_both_zero || is_opposite || is_one_zero) ? {5'b0} : {1'b0, 1'b0, overflow, underflow, inexact};
+assign io_fflags = (is_nan || is_inf) ? {special_flag, 4'b0} : io_fflags_0;
+wire [31:0]io_result_0 = overflow ? overflow_result : normal_result;
+assign io_result = special_case_happen ? special_result : io_result_0;
+
+endmodule
