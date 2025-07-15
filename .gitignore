@@ -9,3 +9,5 @@ temp/*
 results/*
 pkl/*
 .vscode/*
+*.log
+output/*

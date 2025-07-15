@@ -109,7 +109,7 @@ if __name__ == "__main__":
             func_list = [tarantula, jaccard, ochiai, D, naish1]
             fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=10, dist_factor=dist_factor, type=args.analyser_type)
             
-            output = Output_helper(f"scores_{target_file}")
+            output = Output_helper(f"scores_{target_file.split('.')[0]}")
             for func in func_list:
                 lst   = statistics.get_var_location_list(func)
                 statistics.printlist(target_file , func, 100)
