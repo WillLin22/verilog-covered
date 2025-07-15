@@ -24,8 +24,11 @@ modified_files=$(echo $files | sed 's/\.v/_modified.v/g')
 # done
 modified_files_2=$(echo $modified_files | sed 's/_modified\.v/_modified2.v/g')
 nobranch_files=$(echo $modified_files | sed 's/_modified\.v/_nobranch_modified.v/g')
-echo "Running final step: evaluate those modified files and check the score"
-python main.py --target-files fadd32_1_modified0_2.v $modified_files_2 --ios $io10000 --analyse-only --faulty-vars n_carry_out $faulty_vars --analyse-output-file scores_modified2.txt
-python main.py --target-files fadd32_1_nobranch_modified0.v $nobranch_files --ios $io10000 --analyse-only --faulty-vars n_carry_out $faulty_vars --analyse-output-file scores_nobranch.txt
-python main.py --target-files fadd32_01.v $files --ios $io10000 --analyse-only --faulty-vars n_carry_out $faulty_vars --analyse-output-file scores_original.txt
+# echo "Running final step: evaluate those modified files and check the score"
+vars_limit="999999"
+zeros="1 2 3 4 5 6 7 8 9 10"
+for zero in $zeros; do
+    echo "Running with dist_factor_zero = $zero"
+    python main.py --target-files $modified_files_2 --ios $io10000 --analyse-only --faulty-vars $faulty_vars --vars-limit $vars_limit --dist-factor-zero $zero --analyser-type 4 --analyse-output-file "score_${zero}.txt"
+done
 tar -czvf output.tar.gz output

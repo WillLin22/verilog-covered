@@ -47,6 +47,8 @@ if __name__ == "__main__":
     myparser = MyParser()
     code_dir = os.path.dirname(os.path.abspath(__file__)) + "/test/"
     args = myparser.parse_args()
+    vars_limit = args.vars_limit
+    zero = args.dist_factor_zero
     for i, target_file in enumerate(args.target_files):
         code_path = code_dir + target_file
         # "/home/willlin/miniforge3/envs/veribench/bin/iverilog"
@@ -92,11 +94,11 @@ if __name__ == "__main__":
         if args.analyse_result or args.analyse_only:
             # def dist_factor(x, d):
             #     return x * (1 - d*0.1) if d >= 0 and d < 10 else 0
-            def dist_factor(x, d, e=2):
+            def dist_factor(x, d, zero=5 , e=2):
                 """
-                采用非线性的e次函数，距离为0的时候比例为1，距离为10的时候比例为0
+                采用非线性的e次函数，距离为0的时候比例为zero，距离为10的时候比例为0
                 """
-                return x * (1 - (d / 10) ** e) if d >= 0 and d < 10 else 0 
+                return x * (1 - (d / zero) ** e) if d >= 0 and d < zero else 0 
             faulty_var=""           
             if not is_arg_specified('--faulty-vars') or i >= len(args.faulty_vars):
                 print(f"Warning: No faulty variable specified, using default: {args.faulty_vars[0]}")
@@ -107,10 +109,10 @@ if __name__ == "__main__":
             dists = graph.run(analyzer.expressions)
             statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
             func_list = [tarantula, jaccard, ochiai, D, naish1]
-            fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=999999, dist_factor=dist_factor, type=args.analyser_type)
+            fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=vars_limit, dist_factor=lambda x, d: dist_factor(x, d, zero=zero), type=args.analyser_type)
             
             output_file = f"scores_{target_file.split('.')[0]}_{args.ios.split('.')[1]}" if args.analyse_output_file == None else args.analyse_output_file
-            output = Output_helper(f"scores_{target_file.split('.')[0]}")
+            output = Output_helper(output_file)
             for func in func_list:
                 lst   = statistics.get_var_location_list(func)
                 statistics.printlist(target_file , func, 100)
