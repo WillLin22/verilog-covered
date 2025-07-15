@@ -8,6 +8,7 @@ faulty_vars="rounded_exp round_up round_up round_up round_up round_up smaller_st
 io100="fadd32.io100"
 io10000="fadd32.io10000"
 source ./env.sh
+rm -rf output
 # echo "Running to generate first modified files..."
 # python main.py --target-files $files --ios $io100 --get-modified-code
 # mv -f ./fadd32_* ./test
@@ -29,6 +30,6 @@ vars_limit="999999"
 zeros="1 2 3 4 5 6 7 8 9 10"
 for zero in $zeros; do
     echo "Running with dist_factor_zero = $zero"
-    python main.py --target-files $modified_files_2 --ios $io10000 --analyse-only --faulty-vars $faulty_vars --vars-limit $vars_limit --dist-factor-zero $zero --analyser-type 4 --analyse-output-file "score_${zero}.txt"
+    python main.py --target-files $nobranch_files --ios $io10000 --analyse-only --faulty-vars $faulty_vars --vars-limit $vars_limit --dist-factor-zero $zero --analyser-type 4 --analyse-output-file "score_${zero}.txt"
 done
 tar -czvf output.tar.gz output
