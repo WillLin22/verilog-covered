@@ -8,21 +8,24 @@ faulty_vars="rounded_exp round_up round_up round_up round_up round_up smaller_st
 io100="fadd32.io100"
 io10000="fadd32.io10000"
 source ./env.sh
-echo "Running to generate first modified files..."
-python main.py --target-files $files --ios $io100 --get-modified-code
-mv -f ./fadd32_* ./test
+# echo "Running to generate first modified files..."
+# python main.py --target-files $files --ios $io100 --get-modified-code
+# mv -f ./fadd32_* ./test
 modified_files=$(echo $files | sed 's/\.v/_modified.v/g')
-echo "Running to generate modified files that add intermediate vars..."
-python main.py --target-files $modified_files --ios $io100 --add-variables
-echo "mv all output modified files into test and name it \"modified2\""
-for file in fadd32_*_modified_modified.v; do
-    if [ -f "$file" ]; then
-        # 提取文件名并替换
-        new_name=$(echo "$file" | sed 's/_modified_modified\.v/_modified2.v/')
-        mv "$file" "./test/$new_name"
-    fi
-done
+# echo "Running to generate modified files that add intermediate vars..."
+# python main.py --target-files $modified_files --ios $io100 --add-variables
+# echo "mv all output modified files into test and name it \"modified2\""
+# for file in fadd32_*_modified_modified.v; do
+#     if [ -f "$file" ]; then
+#         # 提取文件名并替换
+#         new_name=$(echo "$file" | sed 's/_modified_modified\.v/_modified2.v/')
+#         mv "$file" "./test/$new_name"
+#     fi
+# done
 modified_files_2=$(echo $modified_files | sed 's/_modified\.v/_modified2.v/g')
+nobranch_files=$(echo $modified_files | sed 's/_modified\.v/_nobranch_modified.v/g')
 echo "Running final step: evaluate those modified files and check the score"
-python main.py --target-files fadd32_1_modified0_2.v $modified_files_2 --ios $io10000 --store --analyse-result --faulty-vars n_carry_out $faulty_vars
+python main.py --target-files fadd32_1_modified0_2.v $modified_files_2 --ios $io10000 --analyse-only --faulty-vars n_carry_out $faulty_vars --analyse-output-file scores_modified2.txt
+python main.py --target-files fadd32_1_nobranch_modified0.v $nobranch_files --ios $io10000 --analyse-only --faulty-vars n_carry_out $faulty_vars --analyse-output-file scores_nobranch.txt
+python main.py --target-files fadd32_01.v $files --ios $io10000 --analyse-only --faulty-vars n_carry_out $faulty_vars --analyse-output-file scores_original.txt
 tar -czvf output.tar.gz output
