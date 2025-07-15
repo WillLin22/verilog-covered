@@ -107,15 +107,17 @@ if __name__ == "__main__":
             dists = graph.run(analyzer.expressions)
             statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
             func_list = [tarantula, jaccard, ochiai, D, naish1]
-            fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=10, dist_factor=dist_factor, type=args.analyser_type)
+            fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=999999, dist_factor=dist_factor, type=args.analyser_type)
             
+            output_file = f"scores_{target_file.split('.')[0]}_{args.ios.split('.')[1]}" if args.analyse_output_file == None else args.analyse_output_file
             output = Output_helper(f"scores_{target_file.split('.')[0]}")
             for func in func_list:
                 lst   = statistics.get_var_location_list(func)
                 statistics.printlist(target_file , func, 100)
                 score = fault_analyzer.analyse(faulty_var, lst)
                 print(f"Fault location score for func {func.__name__}: {score:.4f}")
-                output.write(f"Fault location score for func {func.__name__}: \t{score:.4f}", "a")
+                output.write(f"{score:.4f}\t", "a")
+            output.write("\n", "a")
 
         if args.print_ops:
             ops = list(set([int(e.op) for e in analyzer.expressions[1:]]))
