@@ -84,19 +84,29 @@ if __name__ == "__main__":
         if args.get_time:
             print(f"Analysis time: {end_time - start_time:.4f} seconds")
         if args.get_modified_code:
-            analyzer.get_modified_code(target_file)
+            analyzer.get_modified_code(target_file, args.modify_type)
         if args.add_variables:
             analyzer.add_variables(target_file)
         print(f'Total IOs: {len(analyzer.results)}')
         print(f'Correct rate: {sum(analyzer.results)} / {len(analyzer.results)} = {sum(analyzer.results)/len(analyzer.results):.4f}')
         
+        graph = Assign_Graph()
+        output_file = f"scores_{target_file.split('.')[0]}_{args.ios.split('.')[1]}" if args.analyse_output_file == None else args.analyse_output_file
+        if is_arg_specified('--get-code-in-range'):
+            output = Output_helper(output_file)
+            dists = graph.run(analyzer.expressions)
+            var = args.get_code_in_range
+            vars = graph.get_vars_in_range(dists, var, zero)
+            codes = graph.get_code_for_vars(analyzer.expressions, analyzer.codes, vars)
+            for code in codes:
+                output.write(code + '\n', "a")
         
         if args.analyse_result or args.analyse_only:
             # def dist_factor(x, d):
             #     return x * (1 - d*0.1) if d >= 0 and d < 10 else 0
             def dist_factor(x, d, zero=5 , e=2):
                 """
-                采用非线性的e次函数，距离为0的时候比例为zero，距离为10的时候比例为0
+                采用非线性的e次函数，距离为0的时候比例为1，距离为zero的时候比例为0
                 """
                 return x * (1 - (d / zero) ** e) if d >= 0 and d < zero else 0 
             faulty_var=""           
@@ -105,14 +115,12 @@ if __name__ == "__main__":
                 faulty_var = args.faulty_vars[0]
             else:
                 faulty_var = args.faulty_vars[i]
-            graph = Assign_Graph()
+            output = Output_helper(output_file)
             dists = graph.run(analyzer.expressions)
             statistics = statistic(analyzer.expressions, analyzer.codes, analyzer.exec_nums, analyzer.results)
             func_list = [tarantula, jaccard, ochiai, D, naish1]
             fault_analyzer = Fault_Locate_Analyzer_Factory().create(dists, vars_limit=vars_limit, dist_factor=lambda x, d: dist_factor(x, d, zero=zero), type=args.analyser_type)
             
-            output_file = f"scores_{target_file.split('.')[0]}_{args.ios.split('.')[1]}" if args.analyse_output_file == None else args.analyse_output_file
-            output = Output_helper(output_file)
             for func in func_list:
                 lst   = statistics.get_var_location_list(func)
                 statistics.printlist(target_file , func, 100)

@@ -167,9 +167,9 @@ class Analyzer():
             path_string += '\n'
         return path_string
     
-    def get_modified_code(self, target_file):
+    def get_modified_code(self, target_file, type):
         modifier = modify_code(self.expressions, self.codes, output_path=f"./{target_file.split('.')[0]}_modified.v")
-        return modifier.get_modified_code()
+        return modifier.get_modified_code(type == 1)
     def add_variables(self, target_file):
         modifier = modify_code(self.expressions, self.codes, output_path=f"./{target_file.split('.')[0]}_modified.v")
         return modifier.add_variables()
@@ -271,7 +271,9 @@ class modify_code():
         self.output_path = output_path
         self.outputs = self._get_output_sigs()
     def traverse_ast(self, expressions, root, val_list:list[str]):
-        """_summary_
+        """
+        recursively return the value and width of a ast tree. If val_name appears in the val_list,
+        its value is considered to be ~{val_width}'b0 otherwise {val_width}'b0.
 
         Args:
             expressions (list[ast]): Global ast tree
@@ -469,7 +471,23 @@ class modify_code():
                 print(f"_get_str_from_op does not accept op {op}!")
             
             
-    def get_modified_code(self):
+    def get_modified_code(self, all_expand=True):
+        """
+        Modify the original code and output to ./{filename}_modified.v
+        If all_expand is set, all variables in one assignment will be considered thus an O(2^n) expansion will be made.
+        If all_expand is clear, then only when the assignment have no branch will only one branch be added with only one var as condition
+
+        Args:
+            all_expand (bool, optional): Whether to expand all variables. Defaults to True.
+        """
+        def traverse(self, expressions, e, target_ops):
+            if e == None:
+                return False
+            if e.op in target_ops:
+                return True
+            left = expressions[e.left]
+            right = expressions[e.right]
+            return traverse(self, expressions, left, target_ops) or traverse(self, expressions, right, target_ops)
         modified = []
         for idx, e in enumerate(self.expressions[1:]):
             if e.father == None:
@@ -479,7 +497,7 @@ class modify_code():
                 start_line, end_line = self._get_range(idx, e)
                 codes = "".join(code.strip() for code in self.codes[start_line:end_line])
                 lcodes = codes.split('=', 1)[0]
-                rcodes = "(" + codes.split('=', 1)[1].split(';', 1)[0] + ")"
+                rcodes = codes.split('=', 1)[1].split(';', 1)[0]
                 # SBIT_SEL = 35  # 35:0x23. Specifies single-bit signal select (i.e., [x]).
                 # MBIT_SEL = 36  # 36:0x24. Specifies multi-bit signal select (i.e., [x:y]).
                 # SIG = 1  # 1:0x01. Specifies signal value.
@@ -492,21 +510,30 @@ class modify_code():
                         sig_list.add(get_code_for_sig(self.expressions, node))
                     stack.append(node.left)
                     stack.append(node.right)
-                if len(sig_list) > 4 or len(sig_list) == 0:
+                if len(sig_list) == 0:
                     continue
                 sig_list = list(sig_list)
-                cond_list = [[f"{sig} == {w}'b0", f"{sig} == ~{w}'b0"] for sig, w in sig_list]
-                import itertools
-                cond_list = [list(x) for x in itertools.product(*cond_list)]
-                n = len(sig_list)
-                val_list = [ [sig_list[i] for i in range(n) if bits[i]] for bits in itertools.product([0,1], repeat=n) ]
                 res_rcodes = ""
-                for index, cond in enumerate(cond_list):
-                    val, width = self.traverse_ast(self.expressions, root.right, val_list[index])
-                    codes = f"{width}'h" + f"{abs(val) & ((1 << width) - 1):x}"
-                    res_rcodes += "( " + " && ".join(cond) + " )" + " ? " + codes + " : "
-                res_rcodes += rcodes
-                modified.append([start_line, end_line, lcodes + '=' + res_rcodes + ';\n', 0])
+                if all_expand:
+                    if len(sig_list) > 4:
+                        continue
+                    rcodes = '(' + rcodes + ')'
+                    cond_list = [[f"{sig} == {w}'b0", f"{sig} == ~{w}'b0"] for sig, w in sig_list]
+                    import itertools
+                    cond_list = [list(x) for x in itertools.product(*cond_list)]
+                    n = len(sig_list)
+                    val_list = [ [sig_list[i] for i in range(n) if bits[i]] for bits in itertools.product([0,1], repeat=n) ]
+                    for index, cond in enumerate(cond_list):
+                        val, width = self.traverse_ast(self.expressions, root.right, val_list[index])
+                        codes = f"{width}'h" + f"{abs(val) & ((1 << width) - 1):x}"
+                        res_rcodes += "( " + " && ".join(cond) + " )" + " ? " + codes + " : "
+                    res_rcodes += rcodes
+                    modified.append([start_line, end_line, lcodes + '=' + res_rcodes + ';\n', 0])
+                elif not traverse(self, self.expressions, self.expressions[root.right], [25, 26]):
+                    sig, width = sig_list[0]
+                    cond = f"{sig} == {width}'b0"
+                    res_rcodes = cond + ' ? ' + rcodes + ' : ' + rcodes
+                    modified.append([start_line, end_line, lcodes + ' = ' + res_rcodes + ';\n', 0])
         self._output_modified_code(modified)
     def _output_modified_code(self, modified, append=False, append_code=None):
         """

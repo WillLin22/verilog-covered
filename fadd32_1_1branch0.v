@@ -1,0 +1,458 @@
+//golden
+
+module FADD(
+  input  [31:0] io_a,
+  input  [31:0] io_b,
+  input  [2:0]  io_rm,
+  output [31:0] io_result,
+  output [4:0]  io_fflags
+);
+
+  // Sub-module 1: Component Extraction
+wire sign_a_0 = io_a[31] == 1'b0;
+wire sign_a = sign_a_0 ? io_a[31] : io_a[31];
+wire sign_b_0 = io_b[31] == 1'b0;
+wire sign_b = sign_b_0 ? io_b[31] : io_b[31];
+wire exp_a_0 = io_a[30:23] == 8'b0;
+wire [7:0]exp_a = exp_a_0 ? io_a[30:23] : io_a[30:23];
+wire exp_b_0 = io_b[30:23] == 8'b0;
+wire [7:0]exp_b = exp_b_0 ? io_b[30:23] : io_b[30:23];
+wire mant_a_0 = io_a[22:0] == 23'b0;
+wire [22:0]mant_a = mant_a_0 ? io_a[22:0] : io_a[22:0];
+wire mant_b_0 = io_b[22:0] == 23'b0;
+wire [22:0]mant_b = mant_b_0 ? io_b[22:0] : io_b[22:0];
+
+  // Sub-module 2: Classification of Operands
+wire is_normal_a_0 = mant_a == 23'b0;
+wire is_normal_a_1 = exp_a != 8'b0;
+wire is_normal_a_2 = mant_a != 23'b0;
+wire is_normal_a_3 = is_normal_a_1 && is_normal_a_2;
+wire is_normal_a_4 = exp_a != 8'b0;
+wire is_normal_a_5 = mant_a != 23'b0;
+wire is_normal_a_6 = is_normal_a_4 && is_normal_a_5;
+wire is_normal_a = is_normal_a_0 ? is_normal_a_3 : is_normal_a_6;
+wire is_normal_b_0 = exp_b == 8'b0;
+wire is_normal_b_1 = exp_b != 8'b0;
+wire is_normal_b_2 = mant_b != 23'b0;
+wire is_normal_b_3 = is_normal_b_1 && is_normal_b_2;
+wire is_normal_b_4 = exp_b != 8'b0;
+wire is_normal_b_5 = mant_b != 23'b0;
+wire is_normal_b_6 = is_normal_b_4 && is_normal_b_5;
+wire is_normal_b = is_normal_b_0 ? is_normal_b_3 : is_normal_b_6;
+wire is_subnormal_a_0 = mant_a == 23'b0;
+wire is_subnormal_a_1 = exp_a == 8'b0;
+wire is_subnormal_a_2 = mant_a != 23'b0;
+wire is_subnormal_a_3 = is_subnormal_a_1 && is_subnormal_a_2;
+wire is_subnormal_a_4 = exp_a == 8'b0;
+wire is_subnormal_a_5 = mant_a != 23'b0;
+wire is_subnormal_a_6 = is_subnormal_a_4 && is_subnormal_a_5;
+wire is_subnormal_a = is_subnormal_a_0 ? is_subnormal_a_3 : is_subnormal_a_6;
+wire is_subnormal_b_0 = exp_b == 8'b0;
+wire is_subnormal_b_1 = exp_b == 8'b0;
+wire is_subnormal_b_2 = mant_b != 23'b0;
+wire is_subnormal_b_3 = is_subnormal_b_1 && is_subnormal_b_2;
+wire is_subnormal_b_4 = exp_b == 8'b0;
+wire is_subnormal_b_5 = mant_b != 23'b0;
+wire is_subnormal_b_6 = is_subnormal_b_4 && is_subnormal_b_5;
+wire is_subnormal_b = is_subnormal_b_0 ? is_subnormal_b_3 : is_subnormal_b_6;
+wire is_zero_a_0 = mant_a == 23'b0;
+wire is_zero_a_1 = exp_a == 8'b0;
+wire is_zero_a_2 = mant_a == 23'b0;
+wire is_zero_a_3 = is_zero_a_1 && is_zero_a_2;
+wire is_zero_a_4 = exp_a == 8'b0;
+wire is_zero_a_5 = mant_a == 23'b0;
+wire is_zero_a_6 = is_zero_a_4 && is_zero_a_5;
+wire is_zero_a = is_zero_a_0 ? is_zero_a_3 : is_zero_a_6;
+wire is_zero_b_0 = exp_b == 8'b0;
+wire is_zero_b_1 = exp_b == 8'b0;
+wire is_zero_b_2 = mant_b == 23'b0;
+wire is_zero_b_3 = is_zero_b_1 && is_zero_b_2;
+wire is_zero_b_4 = exp_b == 8'b0;
+wire is_zero_b_5 = mant_b == 23'b0;
+wire is_zero_b_6 = is_zero_b_4 && is_zero_b_5;
+wire is_zero_b = is_zero_b_0 ? is_zero_b_3 : is_zero_b_6;
+wire is_inf_a_0 = mant_a == 23'b0;
+wire is_inf_a_1 = exp_a == 8'hFF;
+wire is_inf_a_2 = mant_a == 23'b0;
+wire is_inf_a_3 = is_inf_a_1 && is_inf_a_2;
+wire is_inf_a_4 = exp_a == 8'hFF;
+wire is_inf_a_5 = mant_a == 23'b0;
+wire is_inf_a_6 = is_inf_a_4 && is_inf_a_5;
+wire is_inf_a = is_inf_a_0 ? is_inf_a_3 : is_inf_a_6;
+wire is_inf_b_0 = exp_b == 8'b0;
+wire is_inf_b_1 = exp_b == 8'hFF;
+wire is_inf_b_2 = mant_b == 23'b0;
+wire is_inf_b_3 = is_inf_b_1 && is_inf_b_2;
+wire is_inf_b_4 = exp_b == 8'hFF;
+wire is_inf_b_5 = mant_b == 23'b0;
+wire is_inf_b_6 = is_inf_b_4 && is_inf_b_5;
+wire is_inf_b = is_inf_b_0 ? is_inf_b_3 : is_inf_b_6;
+wire is_nan_a_0 = mant_a == 23'b0;
+wire is_nan_a_1 = exp_a == 8'hFF;
+wire is_nan_a_2 = mant_a != 23'b0;
+wire is_nan_a_3 = is_nan_a_1 && is_nan_a_2;
+wire is_nan_a_4 = exp_a == 8'hFF;
+wire is_nan_a_5 = mant_a != 23'b0;
+wire is_nan_a_6 = is_nan_a_4 && is_nan_a_5;
+wire is_nan_a = is_nan_a_0 ? is_nan_a_3 : is_nan_a_6;
+wire is_nan_b_0 = exp_b == 8'b0;
+wire is_nan_b_1 = exp_b == 8'hFF;
+wire is_nan_b_2 = mant_b != 23'b0;
+wire is_nan_b_3 = is_nan_b_1 && is_nan_b_2;
+wire is_nan_b_4 = exp_b == 8'hFF;
+wire is_nan_b_5 = mant_b != 23'b0;
+wire is_nan_b_6 = is_nan_b_4 && is_nan_b_5;
+wire is_nan_b = is_nan_b_0 ? is_nan_b_3 : is_nan_b_6;
+wire is_Snan_a_0 = is_nan_a == 1'b0;
+wire is_Snan_a_1 = !io_a[22];
+wire is_Snan_a_2 = is_nan_a && is_Snan_a_1;
+wire is_Snan_a_3 = !io_a[22];
+wire is_Snan_a_4 = is_nan_a && is_Snan_a_3;
+wire is_Snan_a = is_Snan_a_0 ? is_Snan_a_2 : is_Snan_a_4;
+wire is_Snan_b_0 = is_nan_b == 1'b0;
+wire is_Snan_b_1 = !io_b[22];
+wire is_Snan_b_2 = is_nan_b && is_Snan_b_1;
+wire is_Snan_b_3 = !io_b[22];
+wire is_Snan_b_4 = is_nan_b && is_Snan_b_3;
+wire is_Snan_b = is_Snan_b_0 ? is_Snan_b_2 : is_Snan_b_4;
+
+
+  // Sub-module 3: Handling Special Cases
+wire is_nan_0 = sign_a == 1'b0;
+wire is_nan_1 = sign_a != sign_b;
+wire is_nan_2 = is_inf_a && is_inf_b && is_nan_1;
+wire is_nan_3 = is_nan_a || is_nan_b || is_nan_2;
+wire is_nan_4 = sign_a != sign_b;
+wire is_nan_5 = is_inf_a && is_inf_b && is_nan_4;
+wire is_nan_6 = is_nan_a || is_nan_b || is_nan_5;
+wire is_nan = is_nan_0 ? is_nan_3 : is_nan_6;
+wire is_inf_0 = is_inf_a == 1'b0;
+wire is_inf_1 = is_inf_a || is_inf_b;
+wire is_inf_2 = !is_nan;
+wire is_inf_3 = is_inf_1 && is_inf_2;
+wire is_inf_4 = is_inf_a || is_inf_b;
+wire is_inf_5 = !is_nan;
+wire is_inf_6 = is_inf_4 && is_inf_5;
+wire is_inf = is_inf_0 ? is_inf_3 : is_inf_6;
+wire is_both_zero_0 = sign_a == 1'b0;
+wire is_both_zero_1 = sign_a == sign_b;
+wire is_both_zero_2 = is_zero_a && is_zero_b && is_both_zero_1;
+wire is_both_zero_3 = sign_a == sign_b;
+wire is_both_zero_4 = is_zero_a && is_zero_b && is_both_zero_3;
+wire is_both_zero = is_both_zero_0 ? is_both_zero_2 : is_both_zero_4;
+wire is_opposite_0 = mant_a == 23'b0;
+wire is_opposite_1 = sign_a != sign_b;
+wire is_opposite_2 = exp_a == exp_b;
+wire is_opposite_3 = mant_a == mant_b;
+wire is_opposite_4 = is_opposite_1 && is_opposite_2 && is_opposite_3;
+wire is_opposite_5 = sign_a != sign_b;
+wire is_opposite_6 = exp_a == exp_b;
+wire is_opposite_7 = mant_a == mant_b;
+wire is_opposite_8 = is_opposite_5 && is_opposite_6 && is_opposite_7;
+wire is_opposite = is_opposite_0 ? is_opposite_4 : is_opposite_8;
+wire is_one_zero_0 = is_zero_b == 1'b0;
+wire is_one_zero_1 = is_zero_a || is_zero_b;
+wire is_one_zero_2 = !is_both_zero;
+wire is_one_zero_3 = is_one_zero_1 && is_one_zero_2;
+wire is_one_zero_4 = is_zero_a || is_zero_b;
+wire is_one_zero_5 = !is_both_zero;
+wire is_one_zero_6 = is_one_zero_4 && is_one_zero_5;
+wire is_one_zero = is_one_zero_0 ? is_one_zero_3 : is_one_zero_6;
+
+wire result_sign_nan = 1'b0;
+wire [7:0]result_exp_nan = 8'hFF;
+wire [22:0]result_mant_nan = 23'b10000000000000000000000;
+
+wire result_sign_inf = is_inf_a ? sign_a : sign_b;
+wire [7:0]result_exp_inf = 8'hFF;
+wire [22:0]result_mant_inf = 23'b0;
+
+wire result_sign_both_zero_0 = sign_a == 1'b0;
+wire result_sign_both_zero = result_sign_both_zero_0 ? sign_a : sign_a;
+wire [7:0]result_exp_both_zero = 8'b0;
+wire [22:0]result_mant_both_zero = 23'b0;
+
+wire result_sign_opposite_0 = io_rm == 3'b010;
+wire result_sign_opposite = result_sign_opposite_0 ? 1'b1 : 1'b0;
+wire [7:0]result_exp_opposite = 8'b0;
+wire [22:0]result_mant_opposite = 23'b0;
+
+wire result_sign_one_zero = is_zero_a ? sign_b : sign_a;
+wire [7:0]result_exp_one_zero = is_zero_a ? exp_b : exp_a;
+wire [22:0]result_mant_one_zero = is_zero_a ? mant_b : mant_a;
+
+
+  // Sub-module 4: Prepare for Addition
+wire effective_subtraction_0 = sign_a == 1'b0;
+wire effective_subtraction_1 = sign_a != sign_b;
+wire effective_subtraction_2 = sign_a != sign_b;
+wire effective_subtraction = effective_subtraction_0 ? effective_subtraction_1 : effective_subtraction_2;
+wire [23:0]mant_ext_a_0 = {1'b0, mant_a};
+wire [23:0]mant_ext_a_1 = {1'b1, mant_a};
+wire [23:0]mant_ext_a = is_subnormal_a ? mant_ext_a_0 : mant_ext_a_1;
+wire [23:0]mant_ext_b_0 = {1'b0, mant_b};
+wire [23:0]mant_ext_b_1 = {1'b1, mant_b};
+wire [23:0]mant_ext_b = is_subnormal_b ? mant_ext_b_0 : mant_ext_b_1;
+wire [31:0]exp_ext_a_0 = exp_a + 1;
+wire [7:0]exp_ext_a = is_subnormal_a ? exp_ext_a_0 : exp_a;
+wire [31:0]exp_ext_b_0 = exp_b + 1;
+wire [7:0]exp_ext_b = is_subnormal_b ? exp_ext_b_0 : exp_b;
+wire exp_diff_0 = exp_ext_a > exp_ext_b;
+wire [7:0]exp_diff_1 = exp_ext_a - exp_ext_b;
+wire [7:0]exp_diff_2 = exp_ext_b - exp_ext_a;
+wire [7:0]exp_diff = exp_diff_0 ? exp_diff_1 : exp_diff_2;
+wire aligned_exp_0 = exp_ext_a > exp_ext_b;
+wire [7:0]aligned_exp = aligned_exp_0 ? exp_ext_a : exp_ext_b;
+
+  // Sub-module 5: Mantissa Alignment
+
+
+wire need_swap_0 = mant_ext_a == 24'b0;
+wire need_swap_1 = exp_ext_a < exp_ext_b;
+wire need_swap_2 = exp_ext_a == exp_ext_b;
+wire need_swap_3 = mant_ext_a < mant_ext_b;
+wire need_swap_4 = need_swap_2 && need_swap_3;
+wire need_swap_5 = need_swap_1 || need_swap_4;
+wire need_swap_6 = exp_ext_a < exp_ext_b;
+wire need_swap_7 = exp_ext_a == exp_ext_b;
+wire need_swap_8 = mant_ext_a < mant_ext_b;
+wire need_swap_9 = need_swap_7 && need_swap_8;
+wire need_swap_10 = need_swap_6 || need_swap_9;
+wire need_swap = need_swap_0 ? need_swap_5 : need_swap_10;
+  
+wire [25:0]shift_smaller_0 = {mant_ext_a, 2'b00};
+wire [25:0]shift_smaller_1 = {mant_ext_b, 2'b00};
+wire [25:0]shift_smaller = need_swap ? shift_smaller_0 : shift_smaller_1;
+wire shift_too_large_0 = exp_diff == 8'b0;
+wire shift_too_large_1 = exp_diff >= 26;
+wire shift_too_large_2 = exp_diff >= 26;
+wire shift_too_large = shift_too_large_0 ? shift_too_large_1 : shift_too_large_2;
+wire [25:0]main_0 = shift_smaller >> exp_diff;
+wire [25:0]main = shift_too_large ? 0 : main_0;
+wire smaller_sticky_0 = |shift_smaller;
+wire [31:0]smaller_sticky_1 = 1 << exp_diff;
+wire [31:0]smaller_sticky_2 = smaller_sticky_1 - 1;
+wire [31:0]smaller_sticky_3 = shift_smaller & smaller_sticky_2;
+wire smaller_sticky_4 = |smaller_sticky_3;
+wire smaller_sticky = shift_too_large ? smaller_sticky_0 : smaller_sticky_4;
+
+wire aligned_mant_smaller_0 = smaller_sticky == 1'b0;
+wire [27:0]aligned_mant_smaller_1 = {1'b0, main, smaller_sticky};
+wire [27:0]aligned_mant_smaller_2 = {1'b0, main, smaller_sticky};
+wire [27:0]aligned_mant_smaller = aligned_mant_smaller_0 ? aligned_mant_smaller_1 : aligned_mant_smaller_2;
+wire [27:0]aligned_mant_larger_0 = {1'b0, mant_ext_b, 3'b000};
+wire [27:0]aligned_mant_larger_1 = {1'b0, mant_ext_a, 3'b000};
+wire [27:0]aligned_mant_larger = need_swap ? aligned_mant_larger_0 : aligned_mant_larger_1;
+
+wire resultant_sign_0 = !effective_subtraction;
+wire resultant_sign_1 = need_swap ? sign_b : sign_a;
+wire resultant_sign = resultant_sign_0 ? sign_a : resultant_sign_1;
+
+wire adder_result_0 = !effective_subtraction;
+wire [27:0]adder_result_1 = aligned_mant_larger + aligned_mant_smaller;
+wire [27:0]adder_result_2 = aligned_mant_larger - aligned_mant_smaller;
+wire [27:0]adder_result = adder_result_0 ? adder_result_1 : adder_result_2;
+
+
+  // Sub-module 6: Result Normalization and Left shifting
+wire carry_out_0 = adder_result[27] == 1'b0;
+wire carry_out = carry_out_0 ? adder_result[27] : adder_result[27];
+wire implied_bit_0 = adder_result[26] == 1'b0;
+wire implied_bit = implied_bit_0 ? adder_result[26] : adder_result[26];
+wire cancellation_0 = implied_bit == 1'b0;
+wire cancellation_1 = !carry_out;
+wire cancellation_2 = !implied_bit;
+wire cancellation_3 = cancellation_1 && cancellation_2;
+wire cancellation_4 = !carry_out;
+wire cancellation_5 = !implied_bit;
+wire cancellation_6 = cancellation_4 && cancellation_5;
+wire cancellation = cancellation_0 ? cancellation_3 : cancellation_6;
+wire keep_0 = implied_bit == 1'b0;
+wire keep_1 = !carry_out;
+wire keep_2 = keep_1 && implied_bit;
+wire keep_3 = !carry_out;
+wire keep_4 = keep_3 && implied_bit;
+wire keep = keep_0 ? keep_2 : keep_4;
+  // wire small_add = is_subnormal_a && is_subnormal_b;
+wire small_add_0 = exp_a == 8'b0;
+wire small_add_1 = exp_a == 8'h00;
+wire small_add_2 = exp_b == 8'h00;
+wire small_add_3 = small_add_1 && small_add_2;
+wire small_add_4 = exp_a == 8'h00;
+wire small_add_5 = exp_b == 8'h00;
+wire small_add_6 = small_add_4 && small_add_5;
+wire small_add = small_add_0 ? small_add_3 : small_add_6;
+wire [4:0]computed_shift_0 = adder_result[3] ? 5'd23 : 5'd24;
+wire [4:0]computed_shift_1 = adder_result[4] ? 5'd22 : computed_shift_0;
+wire [4:0]computed_shift_2 = adder_result[5] ? 5'd21 : computed_shift_1;
+wire [4:0]computed_shift_3 = adder_result[6] ? 5'd20 : computed_shift_2;
+wire [4:0]computed_shift_4 = adder_result[7] ? 5'd19 : computed_shift_3;
+wire [4:0]computed_shift_5 = adder_result[8] ? 5'd18 : computed_shift_4;
+wire [4:0]computed_shift_6 = adder_result[9] ? 5'd17 : computed_shift_5;
+wire [4:0]computed_shift_7 = adder_result[10] ? 5'd16 : computed_shift_6;
+wire [4:0]computed_shift_8 = adder_result[11] ? 5'd15 : computed_shift_7;
+wire [4:0]computed_shift_9 = adder_result[12] ? 5'd14 : computed_shift_8;
+wire [4:0]computed_shift_10 = adder_result[13] ? 5'd13 : computed_shift_9;
+wire [4:0]computed_shift_11 = adder_result[14] ? 5'd12 : computed_shift_10;
+wire [4:0]computed_shift_12 = adder_result[15] ? 5'd11 : computed_shift_11;
+wire [4:0]computed_shift_13 = adder_result[16] ? 5'd10 : computed_shift_12;
+wire [4:0]computed_shift_14 = adder_result[17] ? 5'd9 : computed_shift_13;
+wire [4:0]computed_shift_15 = adder_result[18] ? 5'd8 : computed_shift_14;
+wire [4:0]computed_shift_16 = adder_result[19] ? 5'd7 : computed_shift_15;
+wire [4:0]computed_shift_17 = adder_result[20] ? 5'd6 : computed_shift_16;
+wire [4:0]computed_shift_18 = adder_result[21] ? 5'd5 : computed_shift_17;
+wire [4:0]computed_shift_19 = adder_result[22] ? 5'd4 : computed_shift_18;
+wire [4:0]computed_shift_20 = adder_result[23] ? 5'd3 : computed_shift_19;
+wire [4:0]computed_shift_21 = adder_result[24] ? 5'd2 : computed_shift_20;
+wire [4:0]computed_shift = adder_result[25] ? 5'd1 : computed_shift_21;
+wire real_shift_norm_0 = aligned_exp > computed_shift;
+wire [31:0]real_shift_norm_1 = aligned_exp - 1;
+wire [4:0]real_shift_norm = real_shift_norm_0 ? computed_shift : real_shift_norm_1;
+wire adjusted_exp_0 = aligned_exp > computed_shift;
+wire [7:0]adjusted_exp_1 = aligned_exp - computed_shift;
+wire [7:0]adjusted_exp = adjusted_exp_0 ? adjusted_exp_1 : 8'b0;
+  
+wire [26:0]normalized_mantissa_0 = {adder_result[27:2], (|adder_result[1:0])};
+wire normalized_mantissa_1 = keep || small_add;
+wire [26:0]normalized_mantissa_2 = {adder_result[26:1], adder_result[0]};
+wire normalized_mantissa_3 = !small_add;
+wire normalized_mantissa_4 = cancellation && normalized_mantissa_3;
+wire [25:0]normalized_mantissa_5 = {(adder_result[25:0] << real_shift_norm)};
+wire [26:0]normalized_mantissa_6 = normalized_mantissa_4 ? normalized_mantissa_5 : adder_result[26:0];
+wire [26:0]normalized_mantissa_7 = normalized_mantissa_1 ? normalized_mantissa_2 : normalized_mantissa_6;
+wire [26:0]normalized_mantissa = carry_out ? normalized_mantissa_0 : normalized_mantissa_7;
+wire [31:0]normalized_exp_0 = aligned_exp + 1;
+wire [7:0]normalized_exp_1 = cancellation ? adjusted_exp : aligned_exp;
+wire [7:0]normalized_exp_2 = keep ? aligned_exp : normalized_exp_1;
+wire [7:0]normalized_exp = carry_out ? normalized_exp_0 : normalized_exp_2;
+
+  // Sub-module 7: Rounding processing
+wire rounding_input_0 = normalized_mantissa[25:3] == 23'b0;
+wire [22:0]rounding_input = rounding_input_0 ? normalized_mantissa[25:3] : normalized_mantissa[25:3];
+wire f1_0 = normalized_mantissa[3] == 1'b0;
+wire f1 = f1_0 ? normalized_mantissa[3] : normalized_mantissa[3];
+wire f2_0 = normalized_mantissa[2] == 1'b0;
+wire f2 = f2_0 ? normalized_mantissa[2] : normalized_mantissa[2];
+wire f3_0 = normalized_mantissa[1:0] == 2'b0;
+wire f3_1 = |normalized_mantissa[1:0];
+wire f3_2 = |normalized_mantissa[1:0];
+wire f3 = f3_0 ? f3_1 : f3_2;
+wire inexact_flag_0 = f3 == 1'b0;
+wire inexact_flag_1 = f2 | f3;
+wire inexact_flag_2 = f2 | f3;
+wire inexact_flag = inexact_flag_0 ? inexact_flag_1 : inexact_flag_2;
+wire round_up_0 = io_rm == 3'b000;
+wire round_up_1 = f1 || f3;
+wire round_up_2 = f2 && round_up_1;
+wire round_up_3 = io_rm == 3'b001;
+wire round_up_4 = io_rm == 3'b010;
+wire round_up_5 = inexact_flag && resultant_sign;
+wire round_up_6 = io_rm == 3'b011;
+wire round_up_7 = !resultant_sign;
+wire round_up_8 = inexact_flag && round_up_7;
+wire round_up_9 = io_rm == 3'b100;
+wire round_up_10 = round_up_9 ? f2 : 1'b0;
+wire round_up_11 = round_up_6 ? round_up_8 : round_up_10;
+wire round_up_12 = round_up_4 ? round_up_5 : round_up_11;
+wire round_up_13 = round_up_3 ? 1'b0 : round_up_12;
+wire round_up = round_up_0 ? round_up_2 : round_up_13;
+wire n_carry_out_0 = round_up == 1'b0;
+wire n_carry_out_1 = &rounding_input;
+wire n_carry_out_2 = round_up && n_carry_out_1;
+wire n_carry_out = n_carry_out_0 ? n_carry_out_2 : 1'b0;
+wire rounded_exp_0 = n_carry_out == 1'b0;
+wire [7:0]rounded_exp_1 = n_carry_out + normalized_exp;
+wire [7:0]rounded_exp_2 = n_carry_out + normalized_exp;
+wire [7:0]rounded_exp = rounded_exp_0 ? rounded_exp_1 : rounded_exp_2;
+wire [31:0]rounded_mantissa_0 = rounding_input + 1;
+wire [22:0]rounded_mantissa = round_up ? rounded_mantissa_0 : rounding_input;
+
+  // Sub-module 8: Exception Flags
+wire tiny_0 = small_add == 1'b0;
+wire tiny_1 = !n_carry_out;
+wire tiny_2 = keep && tiny_1;
+wire tiny_3 = cancellation || tiny_2;
+wire tiny_4 = small_add && tiny_3;
+wire tiny_5 = !n_carry_out;
+wire tiny_6 = keep && tiny_5;
+wire tiny_7 = cancellation || tiny_6;
+wire tiny_8 = small_add && tiny_7;
+wire tiny = tiny_0 ? tiny_4 : tiny_8;
+wire overflow_0 = carry_out == 1'b0;
+wire overflow_1 = rounded_exp == 8'hFF;
+wire overflow_2 = aligned_exp == 8'hFE;
+wire overflow_3 = overflow_2 && carry_out;
+wire overflow_4 = overflow_1 || overflow_3;
+wire overflow_5 = rounded_exp == 8'hFF;
+wire overflow_6 = aligned_exp == 8'hFE;
+wire overflow_7 = overflow_6 && carry_out;
+wire overflow_8 = overflow_5 || overflow_7;
+wire overflow = overflow_0 ? overflow_4 : overflow_8;
+wire inexact_0 = overflow == 1'b0;
+wire inexact_1 = inexact_flag || overflow;
+wire inexact_2 = inexact_flag || overflow;
+wire inexact = inexact_0 ? inexact_1 : inexact_2;
+wire underflow_0 = tiny == 1'b0;
+wire underflow_1 = !overflow;
+wire underflow_2 = tiny && inexact && underflow_1;
+wire underflow_3 = !overflow;
+wire underflow_4 = tiny && inexact && underflow_3;
+wire underflow = underflow_0 ? underflow_2 : underflow_4;
+wire special_flag_0 = sign_a == 1'b0;
+wire special_flag_1 = sign_a != sign_b;
+wire special_flag_2 = is_inf_a && is_inf_b && special_flag_1;
+wire special_flag_3 = is_Snan_a || is_Snan_b || special_flag_2;
+wire special_flag_4 = sign_a != sign_b;
+wire special_flag_5 = is_inf_a && is_inf_b && special_flag_4;
+wire special_flag_6 = is_Snan_a || is_Snan_b || special_flag_5;
+wire special_flag = special_flag_0 ? special_flag_3 : special_flag_6;
+
+  // Sub-module 9: Result Construction
+wire rmin_0 = resultant_sign == 1'b0;
+wire rmin_1 = io_rm == 3'b001;
+wire rmin_2 = io_rm == 3'b010;
+wire rmin_3 = !resultant_sign;
+wire rmin_4 = rmin_2 && rmin_3;
+wire rmin_5 = io_rm == 3'b011;
+wire rmin_6 = rmin_5 && resultant_sign;
+wire rmin_7 = rmin_1 || rmin_4 || rmin_6;
+wire rmin_8 = io_rm == 3'b001;
+wire rmin_9 = io_rm == 3'b010;
+wire rmin_10 = !resultant_sign;
+wire rmin_11 = rmin_9 && rmin_10;
+wire rmin_12 = io_rm == 3'b011;
+wire rmin_13 = rmin_12 && resultant_sign;
+wire rmin_14 = rmin_8 || rmin_11 || rmin_13;
+wire rmin = rmin_0 ? rmin_7 : rmin_14;
+wire [31:0]overflow_result = {resultant_sign, (rmin ? 8'hFE : 8'hFF), (rmin ? 23'h7FFFFF : 23'b0)};
+wire normal_result_0 = rounded_exp == 8'b0;
+wire [31:0]normal_result_1 = {resultant_sign, rounded_exp, rounded_mantissa};
+wire [31:0]normal_result_2 = {resultant_sign, rounded_exp, rounded_mantissa};
+wire [31:0]normal_result = normal_result_0 ? normal_result_1 : normal_result_2;
+wire [31:0]special_result_0 = {result_sign_nan, result_exp_nan, result_mant_nan};
+wire [31:0]special_result_1 = {result_sign_inf, result_exp_inf, result_mant_inf};
+wire [31:0]special_result_2 = {result_sign_both_zero, result_exp_both_zero, result_mant_both_zero};
+wire [31:0]special_result_3 = {result_sign_opposite, result_exp_opposite, result_mant_opposite};
+wire [31:0]special_result_4 = {result_sign_one_zero, result_exp_one_zero, result_mant_one_zero};
+wire [31:0]special_result_5 = {1'b0, 8'hFF, 23'b10000000000000000000000};
+wire [31:0]special_result_6 = is_one_zero ? special_result_4 : special_result_5;
+wire [31:0]special_result_7 = is_opposite ? special_result_3 : special_result_6;
+wire [31:0]special_result_8 = is_both_zero ? special_result_2 : special_result_7;
+wire [31:0]special_result_9 = is_inf ? special_result_1 : special_result_8;
+wire [31:0]special_result = is_nan ? special_result_0 : special_result_9;
+wire special_case_happen_0 = is_nan == 1'b0;
+wire special_case_happen_1 = is_nan || is_inf || is_both_zero || is_opposite || is_one_zero;
+wire special_case_happen_2 = is_nan || is_inf || is_both_zero || is_opposite || is_one_zero;
+wire special_case_happen = special_case_happen_0 ? special_case_happen_1 : special_case_happen_2;
+  
+wire io_fflags_0 = is_nan || is_inf;
+wire [4:0]io_fflags_1 = {special_flag, 4'b0};
+wire io_fflags_2 = is_both_zero || is_opposite || is_one_zero;
+wire [4:0]io_fflags_3 = {5'b0};
+wire [4:0]io_fflags_4 = {1'b0, 1'b0, overflow, underflow, inexact};
+wire [4:0]io_fflags_5 = io_fflags_2 ? io_fflags_3 : io_fflags_4;
+assign io_fflags = io_fflags_0 ? io_fflags_1 : io_fflags_5;
+wire [31:0]io_result_0 = overflow ? overflow_result : normal_result;
+assign io_result = special_case_happen ? special_result : io_result_0;
+
+endmodule
